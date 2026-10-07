@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: golangci/golangci-lint-action@v7
         with:
@@ -47,7 +47,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -64,7 +64,7 @@ jobs:
     name: metainfo validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install appstream
         run: |
           sudo apt-get update

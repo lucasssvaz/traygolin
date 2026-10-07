@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build
         id: build
         env:
