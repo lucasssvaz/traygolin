@@ -26,6 +26,27 @@ On Arch/CachyOS:
 sudo pacman -S go gtk4 libadwaita gobject-introspection polkit
 ```
 
+On Ubuntu 26.04 or later:
+
+```bash
+sudo apt install golang-go gcc pkg-config make git \
+  libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev \
+  gobject-introspection gir1.2-gtk-4.0 gir1.2-adw-1 \
+  pkexec polkitd
+```
+
+Ubuntu 24.04 LTS cannot install Traygolin from its own packages. Noble ships
+GTK 4.14, Libadwaita 1.5, and GLib 2.80. Traygolin needs Libadwaita 1.9, which
+requires GTK >= 4.21 and GLib >= 2.84. Building that stack on 24.04 would
+replace the desktop's widget libraries and is not a supported install path.
+
+Changing the window to older widgets would not be enough either: the
+gotk4-adwaita bindings compile every Libadwaita 1.9 symbol, so a 24.04 link
+fails even if Traygolin never calls `AdwViewSwitcherSidebar`.
+
+Use Ubuntu 26.04 or later (or Arch). Go 1.24 is available on 24.04 as
+`golang-1.24-go`; that is not the blocker.
+
 ## Build and install
 
 ```bash

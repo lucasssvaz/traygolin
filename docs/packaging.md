@@ -22,6 +22,8 @@ Extra Go linker flags go in `GO_LDFLAGS` (for example `-linkmode=external`),
 since `-ldflags` in `GOFLAGS` is overridden by the Makefile's own.
 
 Runtime dependencies: `gtk4`, `libadwaita>=1.9`, `polkit`, and the Pangolin CLI.
+On Ubuntu 26.04+ those packages are `libgtk-4-1`, `libadwaita-1-0`, `pkexec`,
+and `polkitd`.
 
 ## AUR
 

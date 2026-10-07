@@ -10,24 +10,48 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# The UI needs libadwaita 1.9 (AdwViewSwitcherSidebar), which Ubuntu
-# runners do not ship yet, so jobs run in an Arch Linux container.
+# The UI needs libadwaita 1.9 (AdwViewSwitcherSidebar). Hosted Ubuntu
+# runners may still be 24.04 (libadwaita 1.5), so jobs run in containers.
+# Arch is the original target; Ubuntu 26.04 LTS is the Debian-family one.
 # Compiling gotk4's cgo bindings from scratch takes most of a job, so the Go
 # build cache is restored between runs and gotk4 is only built one way per job.
 env:
   ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make xorg-server-xvfb
+  UBUNTU_DEPS: ca-certificates golang-go gcc libc6-dev pkg-config make git libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev gobject-introspection gir1.2-gtk-4.0 gir1.2-adw-1 xvfb
   GOCACHE: /github/home/.cache/go-build
   GOMODCACHE: /github/home/go/pkg/mod
 
 jobs:
   test:
-    name: test and build
+    name: test and build (${{ matrix.os }})
     runs-on: ubuntu-latest
-    container: archlinux:latest
+    container: ${{ matrix.container }}
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: arch
+            container: archlinux:latest
+          - os: ubuntu
+            container: ubuntu:26.04
     steps:
       - name: Install dependencies
-        run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
+        run: |
+          case "${{ matrix.os }}" in
+            arch)
+              pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
+              ;;
+            ubuntu)
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends ${{ env.UBUNTU_DEPS }}
+              ;;
+            *)
+              echo "unknown matrix.os ${{ matrix.os }}"
+              exit 1
+              ;;
+          esac
       - uses: actions/checkout@v7
       - name: Go version
         id: go
@@ -39,8 +63,8 @@ jobs:
           path: |
             ${{ env.GOCACHE }}
             ${{ env.GOMODCACHE }}
-          key: go-test-${{ steps.go.outputs.version }}-${{ hashFiles('go.sum') }}
-          restore-keys: go-test-${{ steps.go.outputs.version }}-
+          key: go-test-${{ matrix.os }}-${{ steps.go.outputs.version }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-test-${{ matrix.os }}-${{ steps.go.outputs.version }}-
       - name: Build
         run: |
           make

@@ -16,7 +16,7 @@ licensed code is used with attribution. See [NOTICE](NOTICE).
 
 ## Requirements
 
-- Linux with GTK 4 and Libadwaita 1.9 or newer
+- Linux with GTK 4 and Libadwaita 1.9 or newer (Ubuntu 26.04 LTS or later, or current Arch)
 - polkit (for passwordless Connect)
 - The official Pangolin CLI installed in `/usr/bin` or `/usr/local/bin`
 - Go 1.24+ to build from source
@@ -35,6 +35,19 @@ curl -fsSL https://static.pangolin.net/get-cli.sh | bash
 paru -S traygolin-bin    # prebuilt release (x86_64)
 paru -S traygolin-git    # built from the latest commit
 ```
+
+### Ubuntu 26.04 or later
+
+```bash
+sudo apt install golang-go gcc pkg-config make git \
+  libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev \
+  gobject-introspection gir1.2-gtk-4.0 gir1.2-adw-1 \
+  pkexec polkitd
+```
+
+Then follow **From source** below. Ubuntu 24.04 LTS cannot be used: it ships
+Libadwaita 1.5 / GTK 4.14, and Libadwaita 1.9 needs GTK 4.21 and GLib 2.84.
+See [docs/install.md](docs/install.md).
 
 ### From source
 
