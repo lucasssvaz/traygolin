@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,12 @@ var ErrHelperMissing = errors.New("the Traygolin privileged helper is not instal
 
 // ErrNotAuthorized means polkit refused or the user dismissed the prompt.
 var ErrNotAuthorized = errors.New("authorization to change the VPN connection was denied")
+
+// ErrDeviceSetup means the saved device credentials are no longer valid
+// and the CLI needs to run once as root before it can register this
+// device again. Signing in again keeps the old credentials, so it does
+// not help.
+var ErrDeviceSetup = errors.New("pangolin needs a one-time administrator setup to register this device")
 
 // UpOptions are Traygolin-specific flags for `pangolin up`. DNS and
 // routing options come from the CLI's own config.json.
@@ -71,10 +78,10 @@ func (c *Client) Up(ctx context.Context, opts UpOptions) error {
 	}
 	env := []string{"PATH=" + dir + string(os.PathListSeparator) + os.Getenv("PATH")}
 	_, err = c.output(ctx, 2*time.Minute, env, UpArgs(opts)...)
-	return classifyUpError(err)
+	return classifyHelperError(err)
 }
 
-func classifyUpError(err error) error {
+func classifyHelperError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -84,16 +91,36 @@ func classifyUpError(err error) error {
 		return ErrHelperMissing
 	case strings.Contains(low, "authorization was denied"), strings.Contains(low, "not authorized"):
 		return ErrNotAuthorized
+	case strings.Contains(low, "rerun this command as sudo"):
+		return ErrDeviceSetup
 	}
 	return err
 }
 
+// ResetDNS restores the system DNS through the helper.
 func (c *Client) ResetDNS(ctx context.Context) error {
-	return c.run(ctx, 15*time.Second, "reset-dns")
+	if !privhelper.Ready() {
+		return ErrHelperMissing
+	}
+	return classifyHelperError(privhelper.ResetDNS(ctx))
 }
 
-func (c *Client) Update(ctx context.Context) (string, error) {
-	return c.output(ctx, 2*time.Minute, nil, "update")
+var newVersionRe = regexp.MustCompile(`new version is available: v?(\S+)`)
+
+// LatestVersion returns the newer CLI release that `pangolin version`
+// reports, or "" if it reports none. It never installs anything: the
+// CLI's own update needs root and runs a downloaded script.
+func (c *Client) LatestVersion(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	out, err := c.command(ctx, nil, "version").CombinedOutput()
+	if err != nil {
+		return "", wrapRunError(c.bin(), []string{"version"}, string(out), "", err)
+	}
+	if m := newVersionRe.FindStringSubmatch(string(out)); m != nil {
+		return m[1], nil
+	}
+	return "", nil
 }
 
 func (c *Client) ListAliases(ctx context.Context) (string, error) {

@@ -18,6 +18,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +27,26 @@ import (
 	"github.com/lucasssvaz/traygolin/internal/pangolin"
 	"github.com/lucasssvaz/traygolin/internal/poller"
 )
+
+func TestUpdateHint(t *testing.T) {
+	if got := updateHint("/usr/bin/pangolin"); got != "Update it with your system package manager." {
+		t.Errorf("packaged: %q", got)
+	}
+	for _, p := range []string{"/usr/local/bin/pangolin", "/home/u/.local/bin/pangolin", ""} {
+		if got := updateHint(p); !strings.Contains(got, "<tt>pangolin update</tt>") {
+			t.Errorf("%q: %q", p, got)
+		}
+	}
+	if got := updateHint("/usr/local/bin/pangolin"); !strings.Contains(got, "<tt>sudo chown root:root /usr/local/bin/pangolin</tt>") {
+		t.Errorf("chown: %q", got)
+	}
+	if got := updateHint(""); strings.Contains(got, "chown") {
+		t.Errorf("no path: %q", got)
+	}
+	if got := updateHint("/opt/a&b/pangolin"); !strings.Contains(got, "/opt/a&amp;b/pangolin") {
+		t.Errorf("escape: %q", got)
+	}
+}
 
 func TestModeText(t *testing.T) {
 	cases := map[string]olm.Peer{

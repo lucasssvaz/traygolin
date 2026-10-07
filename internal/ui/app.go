@@ -457,6 +457,15 @@ func (a *App) connectFailed(err error) {
 		a.showSetup()
 	case errors.Is(err, pangolin.ErrNotAuthorized):
 		a.toast("Authorization was denied")
+	case errors.Is(err, pangolin.ErrDeviceSetup):
+		a.onAppActivate(a.ctx)
+		Info{
+			Heading: "Device Setup Required",
+			Body: "This device's Pangolin credentials are no longer valid, and the Pangolin CLI " +
+				"needs to run once as administrator to register it again. Signing in again does not fix this.\n\n" +
+				"Run these in a terminal, then connect again:\n\n" +
+				"<tt>sudo pangolin up</tt>\n<tt>pangolin down</tt>",
+		}.Show(a, nil)
 	default:
 		msg := firstLine(err.Error())
 		a.notify("Connection Failed", msg)
@@ -759,17 +768,21 @@ func (a *App) checkUpdates() {
 		ctx, cancel := context.WithTimeout(a.ctx, 2*time.Minute)
 		defer cancel()
 
-		out, err := a.cli.Update(ctx)
+		latest, err := a.cli.LatestVersion(ctx)
+		path, _ := a.cli.LookPath()
 		glib.IdleAdd(func() {
 			if err != nil {
 				a.toast(firstLine(err.Error()))
 				return
 			}
-			msg := strings.TrimSpace(out)
-			if msg == "" {
-				msg = "The Pangolin CLI is up to date"
+			if latest == "" {
+				a.toast("No Pangolin CLI update found")
+				return
 			}
-			Info{Heading: "Pangolin CLI", Body: glib.MarkupEscapeText(msg)}.Show(a, nil)
+			Info{
+				Heading: "Pangolin CLI " + latest + " Is Available",
+				Body:    updateHint(path),
+			}.Show(a, nil)
 		})
 	}()
 }

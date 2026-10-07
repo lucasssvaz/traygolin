@@ -54,13 +54,15 @@ func (c *Client) LookPath() (string, error) {
 	return exec.LookPath(c.bin())
 }
 
-// Version returns the CLI version string.
+// Version returns the CLI version string. `pangolin version` may follow
+// it with an update notice, which is dropped.
 func (c *Client) Version(ctx context.Context) (string, error) {
 	out, err := c.output(ctx, 3*time.Second, nil, "version")
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(out), nil
+	v, _, _ := strings.Cut(strings.TrimSpace(out), "\n")
+	return strings.TrimSpace(v), nil
 }
 
 func (c *Client) command(ctx context.Context, extraEnv []string, args ...string) *exec.Cmd {

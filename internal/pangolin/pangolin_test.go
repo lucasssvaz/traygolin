@@ -179,14 +179,48 @@ func TestUpArgs(t *testing.T) {
 	}
 }
 
-func TestClassifyUpError(t *testing.T) {
+func TestClassifyHelperError(t *testing.T) {
 	err := &RunError{Args: []string{"up"}, Output: "traygolin: the privileged helper is not installed. Open Traygolin"}
-	if !errors.Is(classifyUpError(err), ErrHelperMissing) {
+	if !errors.Is(classifyHelperError(err), ErrHelperMissing) {
 		t.Fatal("helper missing")
 	}
 	err = &RunError{Args: []string{"up"}, Output: "traygolin: authorization was denied or dismissed"}
-	if !errors.Is(classifyUpError(err), ErrNotAuthorized) {
+	if !errors.Is(classifyHelperError(err), ErrNotAuthorized) {
 		t.Fatal("denied")
+	}
+	if !errors.Is(classifyHelperError(errors.New("traygolin-helper reset-dns: authorization was denied or dismissed")), ErrNotAuthorized) {
+		t.Fatal("reset-dns denied")
+	}
+	err = &RunError{Args: []string{"up"}, Output: "Please rerun this command as sudo. This is a one time thing for Pangolin to setup your machine."}
+	if !errors.Is(classifyHelperError(err), ErrDeviceSetup) {
+		t.Fatal("device setup")
+	}
+	other := errors.New("boom")
+	if classifyHelperError(other) != other || classifyHelperError(nil) != nil {
+		t.Fatal("passthrough")
+	}
+}
+
+func TestLatestVersion(t *testing.T) {
+	notice := writeFakeCLI(t, `echo "0.18.1"
+echo "" >&2
+printf '\033[33mA new version is available: 0.19.0 (current: 0.18.1)\033[0m\n' >&2
+echo "Run 'pangolin update' to update to the latest version" >&2`)
+	c := &Client{Binary: notice}
+	if v, err := c.LatestVersion(t.Context()); err != nil || v != "0.19.0" {
+		t.Fatalf("latest %q %v", v, err)
+	}
+	if v, err := c.Version(t.Context()); err != nil || v != "0.18.1" {
+		t.Fatalf("version %q %v", v, err)
+	}
+
+	current := &Client{Binary: writeFakeCLI(t, `echo "0.18.1"`)}
+	if v, err := current.LatestVersion(t.Context()); err != nil || v != "" {
+		t.Fatalf("current %q %v", v, err)
+	}
+	failing := &Client{Binary: writeFakeCLI(t, `echo nope >&2; exit 3`)}
+	if _, err := failing.LatestVersion(t.Context()); err == nil {
+		t.Fatal("want error")
 	}
 }
 

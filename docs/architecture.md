@@ -84,6 +84,25 @@ without a password. Inactive and remote sessions need an administrator.
 Status and Disconnect use the tunnel's socket, which is readable by users. If
 it ever is not, Disconnect falls back to `pkexec traygolin-helper down`.
 
+The CLI's `reset-dns` needs root but, unlike `up`, never elevates; it just
+refuses. Reset DNS therefore runs `pkexec traygolin-helper reset-dns`, which
+runs the trusted CLI as `reset-dns --interface pangolin` with no
+caller-supplied arguments and without `--force`, so the CLI still refuses
+while a tunnel is running.
+
+Traygolin does not run `pangolin update`. It pipes a downloaded script into
+`bash` and needs root, and routing it through a passwordless helper would let
+any process in the session run that script as root. Check for CLI Updates
+only reads the notice `pangolin version` prints and shows the commands to run
+in a terminal (or points to the package manager for `/usr/bin/pangolin`).
+
+If the saved device credentials stop being valid and
+`/etc/pangolin/platform_fingerprint` does not exist yet, the CLI's `up` fails
+as the user with "Please rerun this command as sudo" before it ever calls
+`sudo`. That file is written by the root tunnel, so this only affects a
+device that has never connected. Logging in again keeps the old credentials,
+so Traygolin explains the one-time `sudo pangolin up` instead.
+
 ## License boundary
 
 Code copied or adapted from Trayscale keeps its MIT notice. Each such file has

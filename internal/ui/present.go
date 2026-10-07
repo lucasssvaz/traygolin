@@ -16,6 +16,7 @@ package ui
 
 import (
 	"fmt"
+	"html"
 	"strings"
 	"time"
 
@@ -74,6 +75,23 @@ func SitesText(peers []olm.Peer) string {
 		}
 	}
 	return fmt.Sprintf("%d of %d connected", n, len(peers))
+}
+
+// updateHint is Pango markup telling the user how to update the CLI at
+// cliPath. Traygolin never runs `pangolin update` itself: it needs root
+// and pipes a downloaded script into bash, and on a packaged /usr/bin
+// install it would overwrite files the package manager owns.
+func updateHint(cliPath string) string {
+	if strings.HasPrefix(cliPath, "/usr/bin/") {
+		return "Update it with your system package manager."
+	}
+	hint := "Updating needs administrator rights, so run this in a terminal:\n\n<tt>pangolin update</tt>"
+	if cliPath == "" {
+		return hint
+	}
+	return hint + "\n<tt>sudo chown root:root " + html.EscapeString(cliPath) + "</tt>\n\n" +
+		"The second command is needed because the updater leaves the new CLI owned by you, " +
+		"and Traygolin only connects with a root-owned CLI."
 }
 
 // ClientText names the CLI and tunnel versions.

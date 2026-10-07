@@ -94,6 +94,11 @@ user; **Set Up…** fixes that, or run
 `sudo chown root:root /usr/local/bin/pangolin`. A CLI installed somewhere else,
 such as `~/.local/bin`, must be moved to `/usr/local/bin` first.
 
-**Aliases stop resolving after a crash.** Preferences → DNS → Reset DNS.
+**Setup Required after updating the CLI.** `pangolin update` installs the new
+binary owned by your user. Run `sudo chown root:root /usr/local/bin/pangolin`
+or click **Set Up…** again.
+
+**Aliases stop resolving after a crash.** Preferences → DNS → Reset DNS. It
+needs the helper and only works while disconnected.
 
 **Something else.** Main menu → View Logs shows the Pangolin client log.

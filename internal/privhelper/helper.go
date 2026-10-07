@@ -130,7 +130,7 @@ func HelperMain(args []string, stdin io.Reader, stderr io.Writer) int {
 		return 1
 	}
 	if len(args) != 1 {
-		fmt.Fprintln(stderr, "usage: traygolin-helper up|down")
+		fmt.Fprintln(stderr, "usage: traygolin-helper up|down|reset-dns")
 		return 2
 	}
 	switch args[0] {
@@ -176,6 +176,24 @@ func HelperMain(args []string, stdin io.Reader, stderr io.Writer) int {
 		}
 		_ = c.WaitStopped(ctx)
 		return 0
+	case "reset-dns":
+		bin, err := TrustedBinary(TrustedPangolin, 0)
+		if err != nil {
+			fmt.Fprintln(stderr, "traygolin-helper:", err)
+			return 1
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		// No --force: the CLI refuses while a tunnel is still running.
+		cmd := exec.CommandContext(ctx, bin, "reset-dns", "--interface", "pangolin")
+		cmd.Env = []string{"PATH=" + rootPath, "HOME=/root", "USER=root", "LOGNAME=root"}
+		cmd.Stdout = stderr
+		cmd.Stderr = stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintln(stderr, "traygolin-helper: reset-dns:", err)
+			return 1
+		}
+		return 0
 	default:
 		fmt.Fprintln(stderr, "traygolin-helper: unknown command", args[0])
 		return 2
@@ -193,11 +211,13 @@ func pkexecCaller() (*user.User, error) {
 	return user.LookupId(raw)
 }
 
+const rootPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 // upEnv mirrors what sudo gives the CLI's root subprocess, so it reads
 // the caller's ~/.config/pangolin rather than root's.
 func upEnv(u *user.User, keyring bool) []string {
 	env := []string{
-		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+		"PATH=" + rootPath,
 		"HOME=/root",
 		"USER=root",
 		"LOGNAME=root",
@@ -367,12 +387,26 @@ func RunShim(args []string, stderr io.Writer) int {
 // PrivilegedDown asks the helper to stop the tunnel as root. It is only
 // needed when the user cannot reach the tunnel socket directly.
 func PrivilegedDown(ctx context.Context) error {
+	return runHelper(ctx, "down")
+}
+
+// ResetDNS asks the helper to run the CLI's reset-dns as root. The CLI
+// needs root for it and, unlike up, never elevates on its own.
+func ResetDNS(ctx context.Context) error {
+	return runHelper(ctx, "reset-dns")
+}
+
+func runHelper(ctx context.Context, command string) error {
 	if !Installed() {
 		return errors.New("the privileged helper is not installed")
 	}
-	out, err := exec.CommandContext(ctx, "/usr/bin/pkexec", HelperPath, "down").CombinedOutput()
+	out, err := exec.CommandContext(ctx, "/usr/bin/pkexec", HelperPath, command).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("traygolin-helper down: %w: %s", err, strings.TrimSpace(string(out)))
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && (exit.ExitCode() == 126 || exit.ExitCode() == 127) {
+			return fmt.Errorf("traygolin-helper %s: authorization was denied or dismissed", command)
+		}
+		return fmt.Errorf("traygolin-helper %s: %w: %s", command, err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
