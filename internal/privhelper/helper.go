@@ -155,7 +155,7 @@ func HelperMain(args []string, stdin io.Reader, stderr io.Writer) int {
 			args, creds = moveCredentials(args)
 			env = append(env, creds...)
 		}
-		old := socketInode(olm.DefaultSocket)
+		old := socketID(olm.DefaultSocket)
 		if err := spawnDetached(bin, args, env); err != nil {
 			fmt.Fprintln(stderr, "traygolin-helper: start pangolin:", err)
 			return 1
@@ -271,23 +271,33 @@ func moveCredentials(args []string) (rest, env []string) {
 	return rest, env
 }
 
-func socketInode(path string) uint64 {
+// fileID identifies one file at a path. The inode alone is not enough:
+// tmpfs (where /run lives) can give a new file the inode number of one
+// that was just deleted.
+type fileID struct {
+	ino   uint64
+	ctime syscall.Timespec
+}
+
+func idOf(st *syscall.Stat_t) fileID { return fileID{st.Ino, st.Ctim} }
+
+func socketID(path string) fileID {
 	var st syscall.Stat_t
 	if err := syscall.Lstat(path, &st); err != nil {
-		return 0
+		return fileID{}
 	}
-	return st.Ino
+	return idOf(&st)
 }
 
 // restrictSocket waits for olm to replace the socket at path (old is the
-// inode that was there before, or 0) and limits it to uid. olm makes its
-// API socket world-writable, which lets any local user disconnect the
-// tunnel or switch its organization and exit node.
-func restrictSocket(path string, old uint64, uid int, timeout time.Duration) error {
+// file that was there before, or the zero fileID) and limits it to uid.
+// olm makes its API socket world-writable, which lets any local user
+// disconnect the tunnel or switch its organization and exit node.
+func restrictSocket(path string, old fileID, uid int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for {
 		var st syscall.Stat_t
-		if err := syscall.Lstat(path, &st); err == nil && st.Mode&syscall.S_IFMT == syscall.S_IFSOCK && st.Ino != old {
+		if err := syscall.Lstat(path, &st); err == nil && st.Mode&syscall.S_IFMT == syscall.S_IFSOCK && idOf(&st) != old {
 			if err := os.Lchown(path, uid, -1); err != nil {
 				return err
 			}

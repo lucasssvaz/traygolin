@@ -239,7 +239,7 @@ func listen(t *testing.T, path string) net.Listener {
 func TestRestrictSocket(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "olm.sock")
 	stale := listen(t, path)
-	old := socketInode(path)
+	old := socketID(path)
 	stale.Close()
 
 	go func() {
@@ -253,8 +253,8 @@ func TestRestrictSocket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if socketInode(path) == old || fi.Mode().Perm() != 0o600 {
-		t.Fatalf("mode %v, replaced %v", fi.Mode().Perm(), socketInode(path) != old)
+	if socketID(path) == old || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %v, replaced %v", fi.Mode().Perm(), socketID(path) != old)
 	}
 	conn, err := net.Dial("unix", path)
 	if err != nil {
@@ -262,8 +262,35 @@ func TestRestrictSocket(t *testing.T) {
 	}
 	conn.Close()
 
-	if err := restrictSocket(filepath.Join(t.TempDir(), "never.sock"), 0, os.Getuid(), 100*time.Millisecond); err != nil {
+	if err := restrictSocket(filepath.Join(t.TempDir(), "never.sock"), fileID{}, os.Getuid(), 100*time.Millisecond); err != nil {
 		t.Fatal("a socket that never appears is not an error:", err)
+	}
+}
+
+func TestRestrictSocketReusedInode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "olm.sock")
+	listen(t, path)
+	old := socketID(path)
+	old.ctime.Sec--
+	if err := restrictSocket(path, old, os.Getuid(), time.Second); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Fatalf("a new socket with a reused inode number was not restricted: %v", fi.Mode().Perm())
+	}
+	if err := os.Chmod(path, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	same := socketID(path)
+	if err := restrictSocket(path, same, os.Getuid(), 100*time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	if fi, _ := os.Lstat(path); fi.Mode().Perm() != 0o666 {
+		t.Fatalf("the unchanged old socket was touched: %v", fi.Mode().Perm())
 	}
 }
 
