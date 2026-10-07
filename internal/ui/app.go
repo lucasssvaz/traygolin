@@ -155,7 +155,7 @@ func (a *App) init(ctx context.Context) {
 		a.settings = gio.NewSettings(metadata.AppID)
 	}
 
-	a.app = adw.NewApplication(metadata.AppID, gio.ApplicationFlagsNone)
+	a.app = adw.NewApplication(metadata.AppID, gio.ApplicationDefaultFlags)
 
 	var hideWindow bool
 	a.app.AddMainOption("hide-window", 0, glib.OptionFlagNone, glib.OptionArgNone, "Start in the tray without showing the window", "")

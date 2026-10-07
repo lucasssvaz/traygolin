@@ -6,65 +6,93 @@ on:
     branches: [main, master]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 # The UI needs libadwaita 1.9 (AdwViewSwitcherSidebar), which Ubuntu
 # runners do not ship yet, so jobs run in an Arch Linux container.
+# Compiling gotk4's cgo bindings from scratch takes most of a job, so the Go
+# build cache is restored between runs and gotk4 is only built one way per job.
 env:
   ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make xorg-server-xvfb
+  GOCACHE: /github/home/.cache/go-build
+  GOMODCACHE: /github/home/go/pkg/mod
 
 jobs:
   test:
-    name: go test
+    name: test and build
     runs-on: ubuntu-latest
     container: archlinux:latest
+    timeout-minutes: 60
     steps:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
-      - uses: actions/checkout@v4
-      - name: Test
+      - uses: actions/checkout@v7
+      - name: Go version
+        id: go
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          # gotk4's generated marshalers trip -race's checkptr instrumentation.
-          xvfb-run -a go test -race -gcflags=all=-d=checkptr=0 ./...
+          echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: go-test-${{ steps.go.outputs.version }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-test-${{ steps.go.outputs.version }}-
+      - name: Build
+        run: |
+          make
+          test -x bin/traygolin
+          test -x bin/traygolin-helper
+      - name: Test GTK packages
+        run: |
+          xvfb-run -a go test $(go list -f '{{.ImportPath}} {{join .Deps " "}}' ./... | awk '/diamondburned\/gotk4/ {print $1}')
+      - name: Test other packages with the race detector
+        # Kept apart so gotk4, which also fails -race's checkptr checks, is
+        # not rebuilt with race instrumentation.
+        run: |
+          go test -race $(go list -f '{{.ImportPath}} {{join .Deps " "}}' ./... | awk '!/diamondburned\/gotk4/ {print $1}')
+      - name: Install into staging root
+        run: |
+          make DESTDIR="$PWD/stage" PREFIX=/usr install
+          test -x stage/usr/lib/traygolin/traygolin-helper
+          test ! -e stage/usr/share/glib-2.0/schemas/gschemas.compiled
+          grep -q '/usr/lib/traygolin/traygolin-helper' stage/usr/share/polkit-1/actions/io.github.lucasssvaz.Traygolin.policy
 
   lint:
     name: golangci-lint
     runs-on: ubuntu-latest
     container: archlinux:latest
+    timeout-minutes: 60
     steps:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
-      - uses: actions/checkout@v4
-      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: golangci/golangci-lint-action@v7
-        with:
-          version: latest
-          args: --timeout=10m
-
-  build:
-    name: build
-    runs-on: ubuntu-latest
-    container: archlinux:latest
-    steps:
-      - name: Install dependencies
-        run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
-      - uses: actions/checkout@v4
-      - name: Build
+      - uses: actions/checkout@v7
+      - name: Go version
+        id: go
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          make
-          test -x bin/traygolin
-          test -x bin/traygolin-helper
-      - name: Install into staging root
-        run: |
-          make DESTDIR="$PWD/stage" PREFIX=/usr install
-          test -x stage/usr/lib/traygolin/traygolin-helper
-          grep -q '/usr/lib/traygolin/traygolin-helper' stage/usr/share/polkit-1/actions/io.github.lucasssvaz.Traygolin.policy
+          echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: go-lint-${{ steps.go.outputs.version }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-lint-${{ steps.go.outputs.version }}-
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          args: --timeout=30m
 
   metainfo:
     name: metainfo validate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install appstream
         run: |
           sudo apt-get update

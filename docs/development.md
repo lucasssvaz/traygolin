@@ -42,8 +42,15 @@ The first gotk4 compile is slow (cgo against GTK). Later builds use the Go cache
 ## CI
 
 GitHub Actions run in an `archlinux:latest` container because the UI needs
-Libadwaita 1.9. Jobs: `go test -race` under xvfb, golangci-lint, `make` plus a
-staged `make install`, and AppStream metainfo validation.
+Libadwaita 1.9. Jobs: `make`, tests (GTK packages under xvfb, everything else
+with `-race`), a staged `make install`, golangci-lint, and AppStream metainfo
+validation.
+
+A cold gotk4 compile takes most of a CI job, so the Go build and module caches
+are saved between runs, keyed on the Go version and `go.sum`. The first run
+after either changes is slow; later runs reuse the cache. Packages that import
+gotk4 are tested without `-race` so gotk4 is only compiled once per job (it
+also fails `-race`'s checkptr checks).
 
 ## License headers
 

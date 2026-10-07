@@ -12,6 +12,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     container: archlinux:latest
+    timeout-minutes: 60
     permissions:
       contents: write
     outputs:
@@ -20,7 +21,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build
         id: build
         env:
@@ -36,7 +37,7 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "sha256=$(cut -d' ' -f1 SHA256SUMS)" >> "$GITHUB_OUTPUT"
       - name: Publish
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           body: |

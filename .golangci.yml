@@ -7,5 +7,7 @@ linters:
     - staticcheck
     - unused
     - ineffassign
-    - gosimple
+
+formatters:
+  enable:
     - gofmt
