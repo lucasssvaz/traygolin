@@ -67,8 +67,15 @@ sudo setcap -r "$(command -v pangolin)"
 ## Autostart
 
 Turn on **Start at Login** in Preferences → General. Traygolin writes
-`~/.config/autostart/io.github.lucasssvaz.Traygolin.desktop` with `--hide-window`.
-Turn on **Connect at Start** to connect whenever Traygolin starts.
+`~/.config/autostart/io.github.lucasssvaz.Traygolin.desktop` with `--hide-window`,
+so it starts in the tray only. The entry is refreshed each time Traygolin
+starts, so it follows the binary if you switch from a source build to a
+package, and its `TryExec` makes the desktop skip it once Traygolin is
+uninstalled.
+
+Turn on **Connect at Start** to connect whenever Traygolin starts, if you are
+logged in and setup is done. Combined with Start at Login, this connects
+right after you sign in, without a password prompt.
 
 ## Troubleshooting
 

@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/user"
@@ -25,6 +26,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // cliScript builds the detached-mode shell command in the shape the
@@ -188,6 +190,101 @@ func TestUpEnvUsesCaller(t *testing.T) {
 	}
 	if slices.Contains(upEnv(u, false), "PANGOLIN_CREDENTIALS_FROM_KEYRING=1") {
 		t.Error("keyring env without keyring")
+	}
+}
+
+func TestMoveCredentials(t *testing.T) {
+	args := []string{"up", "client", "--org", "o", "--id", "olm-abc", "--secret=s3cr et", "--endpoint", "https://x", "--holepunch=false"}
+	rest, env := moveCredentials(args)
+	if want := []string{"up", "client", "--org", "o", "--endpoint", "https://x", "--holepunch=false"}; !slices.Equal(rest, want) {
+		t.Errorf("args %q", rest)
+	}
+	if want := []string{"PANGOLIN_CLIENT_ID=olm-abc", "PANGOLIN_CLIENT_SECRET=s3cr et"}; !slices.Equal(env, want) {
+		t.Errorf("env %q", env)
+	}
+	if err := ValidateUpArgs(append(slices.Clone(rest), "--id", "a", "--secret", "b")); err != nil {
+		t.Errorf("remaining args no longer validate: %v", err)
+	}
+}
+
+func TestReadsCredentialEnv(t *testing.T) {
+	dir := t.TempDir()
+	newCLI := filepath.Join(dir, "new")
+	oldCLI := filepath.Join(dir, "old")
+	if err := os.WriteFile(newCLI, []byte("\x7fELF...PANGOLIN_CLIENT_SECRET..."), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(oldCLI, []byte("\x7fELF...PANGOLIN_SUBPROCESS..."), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if !readsCredentialEnv(newCLI) || readsCredentialEnv(oldCLI) || readsCredentialEnv(filepath.Join(dir, "missing")) {
+		t.Fatal("credential env detection")
+	}
+}
+
+func listen(t *testing.T, path string) net.Listener {
+	t.Helper()
+	_ = os.Remove(path)
+	l, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { l.Close() })
+	return l
+}
+
+func TestRestrictSocket(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "olm.sock")
+	stale := listen(t, path)
+	old := socketInode(path)
+	stale.Close()
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		listen(t, path)
+	}()
+	if err := restrictSocket(path, old, os.Getuid(), 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if socketInode(path) == old || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %v, replaced %v", fi.Mode().Perm(), socketInode(path) != old)
+	}
+	conn, err := net.Dial("unix", path)
+	if err != nil {
+		t.Fatal("owner can no longer connect:", err)
+	}
+	conn.Close()
+
+	if err := restrictSocket(filepath.Join(t.TempDir(), "never.sock"), 0, os.Getuid(), 100*time.Millisecond); err != nil {
+		t.Fatal("a socket that never appears is not an error:", err)
+	}
+}
+
+func TestTunnelCommand(t *testing.T) {
+	run := filepath.Join(t.TempDir(), "systemd-run")
+	if err := os.WriteFile(run, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	args := []string{"up", "client", "--org", "o"}
+	direct := []string{"/usr/bin/pangolin", "up", "client", "--org", "o"}
+
+	got := tunnelCommand("/usr/bin/pangolin", args, true, []string{"/missing/systemd-run", run})
+	want := append([]string{run, "--scope", "--quiet", "--collect", "--description=Traygolin tunnel", "--"}, direct...)
+	if !slices.Equal(got, want) {
+		t.Errorf("scoped: %q", got)
+	}
+	if got := tunnelCommand("/usr/bin/pangolin", args, false, []string{run}); !slices.Equal(got, direct) {
+		t.Errorf("not booted with systemd: %q", got)
+	}
+	if got := tunnelCommand("/usr/bin/pangolin", args, true, []string{"/missing/systemd-run"}); !slices.Equal(got, direct) {
+		t.Errorf("no systemd-run: %q", got)
 	}
 }
 

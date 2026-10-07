@@ -15,6 +15,7 @@
 package privhelper
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -148,9 +149,21 @@ func HelperMain(args []string, stdin io.Reader, stderr io.Writer) int {
 			fmt.Fprintln(stderr, "traygolin-helper:", err)
 			return 1
 		}
-		if err := spawnDetached(bin, req.Args, upEnv(caller, req.Keyring)); err != nil {
+		args, env := req.Args, upEnv(caller, req.Keyring)
+		if readsCredentialEnv(bin) {
+			var creds []string
+			args, creds = moveCredentials(args)
+			env = append(env, creds...)
+		}
+		old := socketInode(olm.DefaultSocket)
+		if err := spawnDetached(bin, args, env); err != nil {
 			fmt.Fprintln(stderr, "traygolin-helper: start pangolin:", err)
 			return 1
+		}
+		if uid, err := strconv.Atoi(caller.Uid); err == nil {
+			if err := restrictSocket(olm.DefaultSocket, old, uid, 10*time.Second); err != nil {
+				fmt.Fprintln(stderr, "traygolin-helper: restrict olm socket:", err)
+			}
 		}
 		return 0
 	case "down":
@@ -202,13 +215,104 @@ func upEnv(u *user.User, keyring bool) []string {
 	return env
 }
 
+// credentialEnv maps the credential flags to the variables the CLI reads
+// (since 0.17.0) when the flags are absent.
+var credentialEnv = map[string]string{
+	"id":     "PANGOLIN_CLIENT_ID",
+	"secret": "PANGOLIN_CLIENT_SECRET",
+}
+
+// readsCredentialEnv reports whether the CLI binary supports credentialEnv.
+// Running `pangolin version` would also check for updates online.
+func readsCredentialEnv(bin string) bool {
+	data, err := os.ReadFile(bin)
+	return err == nil && bytes.Contains(data, []byte(credentialEnv["secret"]))
+}
+
+// moveCredentials takes --id and --secret out of validated `up client`
+// args and returns them as environment entries instead. Arguments stay
+// world-readable in /proc for the life of the tunnel; the environment of a
+// root process is readable only by root.
+func moveCredentials(args []string) (rest, env []string) {
+	rest = make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		name, value, hasValue := strings.Cut(strings.TrimPrefix(args[i], "--"), "=")
+		key, ok := credentialEnv[name]
+		if !ok || !strings.HasPrefix(args[i], "--") {
+			rest = append(rest, args[i])
+			continue
+		}
+		if !hasValue && i+1 < len(args) {
+			i++
+			value = args[i]
+		}
+		env = append(env, key+"="+value)
+	}
+	return rest, env
+}
+
+func socketInode(path string) uint64 {
+	var st syscall.Stat_t
+	if err := syscall.Lstat(path, &st); err != nil {
+		return 0
+	}
+	return st.Ino
+}
+
+// restrictSocket waits for olm to replace the socket at path (old is the
+// inode that was there before, or 0) and limits it to uid. olm makes its
+// API socket world-writable, which lets any local user disconnect the
+// tunnel or switch its organization and exit node.
+func restrictSocket(path string, old uint64, uid int, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		var st syscall.Stat_t
+		if err := syscall.Lstat(path, &st); err == nil && st.Mode&syscall.S_IFMT == syscall.S_IFSOCK && st.Ino != old {
+			if err := os.Lchown(path, uid, -1); err != nil {
+				return err
+			}
+			return os.Chmod(path, 0o600)
+		}
+		if time.Now().After(deadline) {
+			return nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// systemdRun is used to give the tunnel its own scope. Without it the
+// tunnel inherits the caller's cgroup, so it would keep the app's
+// autostart unit or terminal scope alive, and logout would stall trying
+// to stop root processes it cannot kill.
+var systemdRun = []string{"/usr/bin/systemd-run", "/bin/systemd-run"}
+
+// tunnelCommand returns the argv that starts pangolin, wrapped in a
+// transient system scope when systemd is the init system.
+func tunnelCommand(bin string, args []string, booted bool, runPaths []string) []string {
+	if booted {
+		for _, run := range runPaths {
+			if fi, err := os.Stat(run); err == nil && fi.Mode().IsRegular() {
+				scope := []string{run, "--scope", "--quiet", "--collect", "--description=Traygolin tunnel", "--"}
+				return append(append(scope, bin), args...)
+			}
+		}
+	}
+	return append([]string{bin}, args...)
+}
+
+func systemdBooted() bool {
+	fi, err := os.Stat("/run/systemd/system")
+	return err == nil && fi.IsDir()
+}
+
 func spawnDetached(bin string, args, env []string) error {
 	devnull, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
 	defer devnull.Close()
-	cmd := exec.Command(bin, args...)
+	argv := tunnelCommand(bin, args, systemdBooted(), systemdRun)
+	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Env = env
 	cmd.Dir = "/"
 	cmd.Stdin = devnull

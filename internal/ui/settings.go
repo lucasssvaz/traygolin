@@ -73,7 +73,7 @@ func (a *App) runSettings(ctx context.Context) {
 
 func (a *App) syncAutostart() {
 	want := a.settings.Boolean("start-at-login")
-	if autostart.Enabled() == want {
+	if !want && !autostart.Enabled() {
 		return
 	}
 	exe, err := os.Executable()

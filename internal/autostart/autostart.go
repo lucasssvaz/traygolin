@@ -16,6 +16,7 @@ package autostart
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -50,6 +51,9 @@ func Enabled() bool {
 	return err == nil
 }
 
+// Set installs or removes the autostart entry. An existing entry is
+// rewritten only if it differs, so calling Set on every start keeps the
+// launch command current when the executable moves.
 func Set(enabled bool, execPath string) error {
 	p, err := path()
 	if err != nil {
@@ -62,22 +66,60 @@ func Set(enabled bool, execPath string) error {
 		}
 		return err
 	}
+	body := entry(command(execPath))
+	if old, err := os.ReadFile(p); err == nil && string(old) == body {
+		return nil
+	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
+	return os.WriteFile(p, []byte(body), 0o644)
+}
+
+// command prefers the bare name when PATH resolves it to execPath, so a
+// packaged install keeps working if its location changes.
+func command(execPath string) string {
 	if execPath == "" {
-		execPath = "traygolin"
+		return "traygolin"
 	}
-	body := strings.Join([]string{
+	found, err := exec.LookPath("traygolin")
+	if err != nil {
+		return execPath
+	}
+	a, errA := os.Stat(found)
+	b, errB := os.Stat(execPath)
+	if errA == nil && errB == nil && os.SameFile(a, b) {
+		return "traygolin"
+	}
+	return execPath
+}
+
+// TryExec makes desktops skip the entry once the binary is gone.
+func entry(cmd string) string {
+	return strings.Join([]string{
 		"[Desktop Entry]",
 		"Type=Application",
 		"Name=Traygolin",
 		"Comment=Unofficial Pangolin Linux GUI",
-		"Exec=" + execPath + " --hide-window",
+		"TryExec=" + escapeString(cmd),
+		"Exec=" + escapeString(quoteArg(cmd)) + " --hide-window",
 		"Icon=io.github.lucasssvaz.Traygolin",
 		"Terminal=false",
 		"X-GNOME-Autostart-enabled=true",
 		"",
 	}, "\n")
-	return os.WriteFile(p, []byte(body), 0o644)
+}
+
+// quoteArg quotes an Exec argument per the Desktop Entry spec.
+func quoteArg(s string) string {
+	if !strings.ContainsAny(s, " \t\n\"'\\><~|&;$*?#()`") {
+		return s
+	}
+	r := strings.NewReplacer(`"`, `\"`, "`", "\\`", `$`, `\$`, `\`, `\\`)
+	return `"` + r.Replace(s) + `"`
+}
+
+// escapeString applies the escapes of the spec's string value type.
+func escapeString(s string) string {
+	return strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\t", `\t`, "\r", `\r`).Replace(s)
 }

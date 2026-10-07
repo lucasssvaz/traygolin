@@ -21,7 +21,7 @@ sources:
                                        traygolin-helper (root)
                                                 │
                                                 ▼
-                                    /usr/local/bin/pangolin up … (detached)
+                                    /usr/local/bin/pangolin up … (own system scope)
 
   Disconnect:  POST /exit on olm.sock, then wait for the socket to go away
 ```
@@ -62,7 +62,21 @@ The helper (root, via polkit action `io.github.lucasssvaz.Traygolin.tunnel`):
    `/usr/local/bin`;
 4. sets `SUDO_USER`/`SUDO_UID`/`SUDO_GID` to the caller, so the CLI uses the
    caller's config, exactly as with real `sudo`;
-5. starts it detached in its own session.
+5. starts it detached in its own session and, under systemd, in its own
+   transient `Traygolin tunnel` scope in `system.slice` (`systemd-run --scope`).
+   Otherwise the root tunnel would stay in the cgroup of whatever launched
+   Traygolin, keeping its autostart unit or terminal scope alive and stalling
+   logout on processes the user manager cannot stop;
+6. moves `--id`/`--secret` into `PANGOLIN_CLIENT_ID`/`PANGOLIN_CLIENT_SECRET`
+   when the CLI supports them (0.17.0+). The CLI always passes the device
+   secret as an argument, which any local user can read in
+   `/proc/<pid>/cmdline` for the life of the tunnel
+   ([fosrl/cli#127](https://github.com/fosrl/cli/issues/127)); a root
+   process's environment is readable only by root. The CLI's own short-lived
+   `sudo sh -c …` call still carries it, so that copy needs the upstream fix;
+7. waits for olm to create `/var/run/olm.sock` and makes it owned by the
+   caller with mode 0600. olm creates it world-writable, which would let any
+   local user disconnect the tunnel or switch its organization or exit node.
 
 The polkit action uses `allow_active=yes`, so the active local user connects
 without a password. Inactive and remote sessions need an administrator.
