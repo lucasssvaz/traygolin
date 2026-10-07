@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#FF8C33"/>
+      <stop offset="100%" stop-color="#E8520E"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="58" fill="url(#bg)"/>
+  <!-- Capital T as a network hub -->
+  <rect x="46" y="76" width="112" height="42" rx="21" fill="#FBF6E8"/>
+  <rect x="82" y="76" width="42" height="122" rx="21" fill="#FBF6E8"/>
+  <!-- Peer nodes off the T bar -->
+  <path d="M158 97 H220" fill="none" stroke="#FBF6E8" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="184" cy="97" r="14" fill="#FBF6E8"/>
+  <circle cx="222" cy="97" r="14" fill="#FBF6E8"/>
+</svg>

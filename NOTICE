@@ -1,0 +1,93 @@
+Traygolin
+Copyright 2026 Lucas Saavedra Vaz
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+Traygolin is not affiliated with Fossorial, Pangolin, or Trayscale.
+
+
+Portions derived from Trayscale
+-------------------------------
+
+Parts of Traygolin are copied or adapted from Trayscale
+(https://github.com/DeedleFake/trayscale), Copyright (c) 2025 DeedleFake,
+which is licensed under the MIT License. Those portions remain under the
+MIT License; Traygolin's own changes to them are under Apache-2.0. Each
+derived file carries the header
+
+    Portions Copyright (c) 2025 DeedleFake, MIT License; see LICENSES/MIT-Trayscale.txt
+
+The derived files are:
+
+    internal/gutil/gutil.go          FillFromBuilder, FillFromUI, PointerToWidgetter, Assert
+    internal/poller/poller.go        channel-based Poller and notifier chain
+    internal/tray/tray.go            tray structure and unique.Handle change tracking
+    internal/ui/app.go               App structure, update loop, tray and window setup
+    internal/ui/dialogs.go           Confirmation and Info dialogs
+    internal/ui/mainwindow.go        split-view window, page stack, status switch
+    internal/ui/mainwindow.ui        window layout
+    internal/ui/menu.ui              main and page menus
+    internal/ui/offlinepage.go       offline page
+    internal/ui/offlinepage.ui       offline page layout
+    internal/ui/preferences.go       preferences dialog loading
+    internal/ui/preferences.ui       preferences dialog layout
+    internal/ui/settings.go          settings change handling, preferences, about
+    internal/ui/sitepage.go          per-peer page, adapted for Pangolin sites
+    internal/ui/sitepage.ui          per-peer page layout
+    internal/ui/ui.go                Page interface and icon helpers
+
+The full Trayscale license text is in LICENSES/MIT-Trayscale.txt and is
+reproduced here as the MIT License requires:
+
+    MIT License
+
+    Copyright (c) 2025 DeedleFake
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+
+Pangolin CLI
+------------
+
+The official Pangolin CLI (fosrl/cli) is a separate program licensed
+under the AGPL-3.0. Traygolin runs the installed `pangolin` binary and
+does not include, copy or link any fosrl/cli source code.
+
+internal/olm is an independent implementation of the client's local
+control protocol (HTTP over the /var/run/olm.sock Unix socket), written
+from observed behaviour and public documentation. internal/privhelper
+parses only the command line that the CLI passes to `sudo`.
+
+
+Third-party modules
+-------------------
+
+Go modules listed in go.mod and go.sum keep their own licenses. That
+includes MIT-licensed libraries such as deedles.dev/tray, which are used
+as dependencies rather than copied source.
+
+
+Trademarks
+----------
+
+The Fossorial name and Pangolin logos are trademarks of Fossorial, Inc.
+Fossorial's terms of service grant no license to use those marks without
+prior written permission. Traygolin therefore ships an original icon and
+does not include the official Pangolin logo.

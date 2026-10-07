@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  Copyright 2026 Lucas Saavedra Vaz. Apache License 2.0.
+  Portions Copyright (c) 2025 DeedleFake, MIT License; see LICENSES/MIT-Trayscale.txt
+-->
+<interface>
+  <requires lib="gio" version="2.0"/>
+  <menu id="MainMenu">
+    <section id="TunnelSection"/>
+    <section>
+      <item>
+        <attribute name="action">app.login</attribute>
+        <attribute name="label">_Add Account…</attribute>
+      </item>
+      <item>
+        <attribute name="action">app.logout</attribute>
+        <attribute name="label">_Log Out</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="action">app.preferences</attribute>
+        <attribute name="label">_Preferences</attribute>
+      </item>
+      <item>
+        <attribute name="action">app.logs</attribute>
+        <attribute name="label">View _Logs</attribute>
+      </item>
+      <item>
+        <attribute name="action">app.check-updates</attribute>
+        <attribute name="label">Check for CLI _Updates</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="action">app.about</attribute>
+        <attribute name="label">_About Traygolin</attribute>
+      </item>
+      <item>
+        <attribute name="action">app.quit</attribute>
+        <attribute name="label">_Quit</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="PageMenu">
+    <section>
+      <item>
+        <attribute name="action">page.copy-address</attribute>
+        <attribute name="label">_Copy Address</attribute>
+      </item>
+      <item>
+        <attribute name="action">page.copy-endpoint</attribute>
+        <attribute name="label">Copy _Endpoint</attribute>
+      </item>
+    </section>
+  </menu>
+</interface>

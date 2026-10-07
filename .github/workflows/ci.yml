@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# The UI needs libadwaita 1.9 (AdwViewSwitcherSidebar), which Ubuntu
+# runners do not ship yet, so jobs run in an Arch Linux container.
+env:
+  ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make xorg-server-xvfb
+
+jobs:
+  test:
+    name: go test
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
+      - uses: actions/checkout@v4
+      - name: Test
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          # gotk4's generated marshalers trip -race's checkptr instrumentation.
+          xvfb-run -a go test -race -gcflags=all=-d=checkptr=0 ./...
+
+  lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
+      - uses: actions/checkout@v4
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: golangci/golangci-lint-action@v7
+        with:
+          version: latest
+          args: --timeout=10m
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make
+          test -x bin/traygolin
+          test -x bin/traygolin-helper
+      - name: Install into staging root
+        run: |
+          make DESTDIR="$PWD/stage" PREFIX=/usr install
+          test -x stage/usr/lib/traygolin/traygolin-helper
+          grep -q '/usr/lib/traygolin/traygolin-helper' stage/usr/share/polkit-1/actions/io.github.lucasssvaz.Traygolin.policy
+
+  metainfo:
+    name: metainfo validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install appstream
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream
+      - name: Validate
+        run: appstreamcli validate --pedantic --no-net --explain io.github.lucasssvaz.Traygolin.metainfo.xml

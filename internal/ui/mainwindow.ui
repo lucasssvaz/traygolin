@@ -1,0 +1,104 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  Copyright 2026 Lucas Saavedra Vaz. Apache License 2.0.
+  Portions Copyright (c) 2025 DeedleFake, MIT License; see LICENSES/MIT-Trayscale.txt
+-->
+<interface>
+  <requires lib="gtk" version="4.18"/>
+  <requires lib="libadwaita" version="1.9"/>
+  <object class="AdwApplicationWindow" id="MainWindow">
+    <property name="content">ToastOverlay</property>
+    <property name="default-height">600</property>
+    <property name="default-width">820</property>
+    <property name="height-request">400</property>
+    <property name="title">Traygolin</property>
+    <property name="width-request">320</property>
+    <child>
+      <object class="AdwToastOverlay" id="ToastOverlay">
+        <child>
+          <object class="AdwNavigationSplitView" id="SplitView">
+            <property name="content">
+              <object class="AdwNavigationPage">
+                <property name="child">
+                  <object class="AdwToolbarView">
+                    <property name="content">
+                      <object class="AdwViewStack" id="PagesStack"/>
+                    </property>
+                    <child type="top">
+                      <object class="AdwHeaderBar" id="PageHeaderBar">
+                        <property name="show-start-title-buttons">False</property>
+                        <property name="show-title">False</property>
+                        <child type="end">
+                          <object class="GtkMenuButton" id="PageMenuButton">
+                            <property name="icon-name">view-more-symbolic</property>
+                            <property name="menu-model">PageMenu</property>
+                            <property name="tooltip-text">Page Actions</property>
+                          </object>
+                        </child>
+                        <child type="end">
+                          <object class="AdwSpinner" id="WorkSpinner">
+                            <property name="visible">False</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </property>
+                <property name="tag">content</property>
+                <property name="title"> </property>
+              </object>
+            </property>
+            <property name="max-sidebar-width">360.0</property>
+            <property name="min-sidebar-width">220.0</property>
+            <property name="sidebar">
+              <object class="AdwNavigationPage">
+                <property name="child">
+                  <object class="AdwToolbarView">
+                    <property name="content">
+                      <object class="AdwViewSwitcherSidebar" id="PagesSidebar">
+                        <property name="stack">PagesStack</property>
+                      </object>
+                    </property>
+                    <child type="top">
+                      <object class="AdwHeaderBar">
+                        <property name="show-end-title-buttons">False</property>
+                        <child type="start">
+                          <object class="GtkSwitch" id="StatusSwitch">
+                            <property name="tooltip-text">Connect or disconnect</property>
+                            <property name="valign">center</property>
+                          </object>
+                        </child>
+                        <child type="end">
+                          <object class="GtkMenuButton" id="MainMenuButton">
+                            <property name="icon-name">open-menu-symbolic</property>
+                            <property name="menu-model">MainMenu</property>
+                            <property name="primary">True</property>
+                            <property name="tooltip-text">Main Menu</property>
+                          </object>
+                        </child>
+                        <child type="title">
+                          <object class="GtkDropDown" id="AccountDropDown">
+                            <property name="tooltip-text">Account</property>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </property>
+                <property name="tag">sidebar</property>
+                <property name="title">Traygolin</property>
+              </object>
+            </property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwBreakpoint">
+        <condition>max-width: 660sp</condition>
+        <setter object="SplitView" property="collapsed">True</setter>
+        <setter object="PagesSidebar" property="mode">page</setter>
+      </object>
+    </child>
+  </object>
+</interface>

@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  Copyright 2026 Lucas Saavedra Vaz. Apache License 2.0.
+  Portions Copyright (c) 2025 DeedleFake, MIT License; see LICENSES/MIT-Trayscale.txt
+-->
+<interface>
+  <requires lib="gtk" version="4.18"/>
+  <requires lib="libadwaita" version="1.6"/>
+  <object class="AdwStatusPage" id="Page">
+    <property name="child">
+      <object class="AdwClamp">
+        <property name="child">
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <property name="spacing">18</property>
+            <child>
+              <object class="AdwPreferencesGroup" id="CLIGroup">
+                <property name="title">Pangolin CLI Required</property>
+                <property name="description">Traygolin controls the official Pangolin CLI. Install it, then reopen this window.</property>
+                <child>
+                  <object class="AdwActionRow" id="CLIInstallRow">
+                    <property name="title">Install command</property>
+                    <property name="css-classes">property</property>
+                    <child type="suffix">
+                      <object class="GtkButton">
+                        <property name="action-name">app.copy-cli-install</property>
+                        <property name="icon-name">edit-copy-symbolic</property>
+                        <property name="tooltip-text">Copy</property>
+                        <property name="valign">center</property>
+                        <property name="css-classes">flat</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="SetupGroup">
+                <property name="title">Setup Required</property>
+                <property name="description">Creating the VPN interface needs administrator rights. Install Traygolin's small system helper once so that Connect works without a password prompt, like the official clients.</property>
+                <child>
+                  <object class="AdwButtonRow">
+                    <property name="action-name">app.setup</property>
+                    <property name="css-classes">suggested-action</property>
+                    <property name="title">Set Up…</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="LoginGroup">
+                <property name="title">Login Required</property>
+                <property name="description">Log in to Pangolin Cloud or your self-hosted Pangolin server before connecting.</property>
+                <child>
+                  <object class="AdwButtonRow">
+                    <property name="action-name">app.login</property>
+                    <property name="css-classes">suggested-action</property>
+                    <property name="title">Log In…</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="ChoicesGroup"/>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="ExitGroup">
+                <property name="title">Routing</property>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="ConnectGroup">
+                <child>
+                  <object class="AdwButtonRow" id="ConnectRow">
+                    <property name="action-name">app.connect</property>
+                    <property name="css-classes">suggested-action</property>
+                    <property name="title">Connect</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </property>
+      </object>
+    </property>
+    <property name="description">Pangolin is not connected</property>
+    <property name="icon-name">network-offline-symbolic</property>
+    <property name="title">Not Connected</property>
+  </object>
+</interface>

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=Traygolin
+GenericName=Pangolin client
+Comment=Unofficial Linux GUI for the Pangolin CLI
+Exec=traygolin
+Icon=io.github.lucasssvaz.Traygolin
+Terminal=false
+Categories=Network;GTK;
+Keywords=pangolin;vpn;wireguard;tray;
+StartupNotify=true
+DBusActivatable=false
+X-GNOME-UsesNotifications=true

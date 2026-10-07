@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.lucasssvaz.Traygolin</id>
+  <name>Traygolin</name>
+  <summary>Unofficial Linux GUI for the Pangolin CLI</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <developer id="io.github.lucasssvaz">
+    <name>Lucas Saavedra Vaz</name>
+  </developer>
+  <description>
+    <p>
+      Traygolin is an unofficial GTK4 and Libadwaita tray application for Linux
+      that wraps the official Pangolin CLI. It provides connect and disconnect,
+      login, account and organization switching, exit node selection, status,
+      DNS and routing preferences, and client logs.
+    </p>
+    <p>
+      Pangolin itself is not included. Install the pangolin CLI separately.
+      Traygolin is not affiliated with Fossorial or Pangolin.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.lucasssvaz.Traygolin.desktop</launchable>
+  <url type="homepage">https://github.com/lucasssvaz/traygolin</url>
+  <url type="bugtracker">https://github.com/lucasssvaz/traygolin/issues</url>
+  <url type="help">https://github.com/lucasssvaz/traygolin/blob/main/docs/usage.md</url>
+  <provides>
+    <binary>traygolin</binary>
+  </provides>
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </recommends>
+  <categories>
+    <category>Network</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-10-06">
+      <description>
+        <p>Initial unofficial Linux GUI wrapping the Pangolin CLI.</p>
+      </description>
+    </release>
+  </releases>
+</component>

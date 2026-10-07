@@ -1,0 +1,7 @@
+/bin/
+/dist/
+/traygolin
+*.syso
+gschemas.compiled
+.cache/
+vendor/

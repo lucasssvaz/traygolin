@@ -1,0 +1,95 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- Copyright 2026 Lucas Saavedra Vaz. Apache License 2.0. -->
+<interface>
+  <requires lib="gtk" version="4.18"/>
+  <requires lib="libadwaita" version="1.6"/>
+  <object class="AdwStatusPage" id="Page">
+    <property name="icon-name">computer-symbolic</property>
+    <property name="title">This Device</property>
+    <property name="child">
+      <object class="AdwClamp">
+        <property name="child">
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <property name="spacing">18</property>
+            <child>
+              <object class="AdwPreferencesGroup">
+                <property name="title">Connection</property>
+                <child>
+                  <object class="AdwActionRow" id="StatusRow">
+                    <property name="title">Status</property>
+                    <property name="css-classes">property</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="AddressRow">
+                    <property name="title">Tunnel address</property>
+                    <property name="css-classes">property</property>
+                    <child type="suffix">
+                      <object class="GtkButton">
+                        <property name="action-name">page.copy-address</property>
+                        <property name="icon-name">edit-copy-symbolic</property>
+                        <property name="tooltip-text">Copy</property>
+                        <property name="valign">center</property>
+                        <property name="css-classes">flat</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="SitesRow">
+                    <property name="title">Sites</property>
+                    <property name="css-classes">property</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="ClientRow">
+                    <property name="title">Client</property>
+                    <property name="css-classes">property</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="ServerVersionRow">
+                    <property name="title">Server</property>
+                    <property name="css-classes">property</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="AccountGroup">
+                <property name="title">Account</property>
+                <child>
+                  <object class="AdwActionRow" id="AccountRow">
+                    <property name="title">Account</property>
+                    <property name="css-classes">property</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="ServerRow">
+                    <property name="title">Server address</property>
+                    <property name="css-classes">property</property>
+                    <child type="suffix">
+                      <object class="GtkButton">
+                        <property name="action-name">page.copy-server</property>
+                        <property name="icon-name">edit-copy-symbolic</property>
+                        <property name="tooltip-text">Copy</property>
+                        <property name="valign">center</property>
+                        <property name="css-classes">flat</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup" id="ExitGroup">
+                <property name="title">Routing</property>
+              </object>
+            </child>
+          </object>
+        </property>
+      </object>
+    </property>
+  </object>
+</interface>

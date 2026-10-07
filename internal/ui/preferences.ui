@@ -1,0 +1,188 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  Copyright 2026 Lucas Saavedra Vaz. Apache License 2.0.
+  Portions Copyright (c) 2025 DeedleFake, MIT License; see LICENSES/MIT-Trayscale.txt
+-->
+<interface>
+  <requires lib="gtk" version="4.18"/>
+  <requires lib="libadwaita" version="1.6"/>
+  <object class="AdwPreferencesDialog" id="PreferencesDialog">
+    <property name="search-enabled">True</property>
+    <child>
+      <object class="AdwPreferencesPage" id="GeneralPage">
+        <property name="icon-name">preferences-system-symbolic</property>
+        <property name="name">general</property>
+        <property name="title">General</property>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title">Startup</property>
+            <child>
+              <object class="AdwSwitchRow" id="StartAtLoginRow"/>
+            </child>
+            <child>
+              <object class="AdwSwitchRow" id="ConnectAtStartRow"/>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title">Appearance</property>
+            <child>
+              <object class="AdwSwitchRow" id="TrayIconRow"/>
+            </child>
+            <child>
+              <object class="AdwSpinRow" id="PollIntervalRow">
+                <property name="adjustment">
+                  <object class="GtkAdjustment" id="PollIntervalAdjustment">
+                    <property name="lower">1</property>
+                    <property name="page-increment">5</property>
+                    <property name="step-increment">1</property>
+                    <property name="upper">3600</property>
+                    <property name="value">5</property>
+                  </object>
+                </property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title">System</property>
+            <child>
+              <object class="AdwActionRow" id="HelperRow">
+                <child type="suffix">
+                  <object class="GtkButton" id="HelperButton">
+                    <property name="action-name">app.setup</property>
+                    <property name="label">Set Up…</property>
+                    <property name="valign">center</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesPage" id="DNSPage">
+        <property name="icon-name">network-workgroup-symbolic</property>
+        <property name="name">dns</property>
+        <property name="title">DNS</property>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title">Aliases</property>
+            <child>
+              <object class="AdwSwitchRow" id="EnableAliasesRow"/>
+            </child>
+            <child>
+              <object class="AdwSwitchRow" id="TunnelDNSRow"/>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup" id="UpstreamGroup">
+            <property name="title">Upstream DNS</property>
+            <child>
+              <object class="AdwEntryRow" id="PrimaryDNSRow">
+                <property name="show-apply-button">True</property>
+              </object>
+            </child>
+            <child>
+              <object class="AdwEntryRow" id="SecondaryDNSRow">
+                <property name="show-apply-button">True</property>
+              </object>
+            </child>
+            <child>
+              <object class="AdwEntryRow" id="MatchDomainsRow">
+                <property name="show-apply-button">True</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title">Troubleshooting</property>
+            <child>
+              <object class="AdwActionRow" id="ResetDNSRow">
+                <child type="suffix">
+                  <object class="GtkButton">
+                    <property name="action-name">app.reset-dns</property>
+                    <property name="label">Reset</property>
+                    <property name="valign">center</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesPage" id="RoutingPage">
+        <property name="icon-name">network-wired-symbolic</property>
+        <property name="name">routing</property>
+        <property name="title">Routing</property>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title">Routes</property>
+            <child>
+              <object class="AdwSwitchRow" id="PreferLocalRow"/>
+            </child>
+            <child>
+              <object class="AdwSwitchRow" id="ExitPrecedeRow"/>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <property name="title">Connection</property>
+            <property name="description">These apply the next time you connect.</property>
+            <child>
+              <object class="AdwSwitchRow" id="HolepunchRow"/>
+            </child>
+            <child>
+              <object class="AdwSwitchRow" id="DisableRelayRow"/>
+            </child>
+            <child>
+              <object class="AdwSpinRow" id="MTURow">
+                <property name="adjustment">
+                  <object class="GtkAdjustment" id="MTUAdjustment">
+                    <property name="lower">576</property>
+                    <property name="page-increment">100</property>
+                    <property name="step-increment">1</property>
+                    <property name="upper">9000</property>
+                    <property name="value">1280</property>
+                  </object>
+                </property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesPage" id="AccountsPage">
+        <property name="icon-name">system-users-symbolic</property>
+        <property name="name">accounts</property>
+        <property name="title">Accounts</property>
+        <child>
+          <object class="AdwPreferencesGroup" id="AccountsGroup">
+            <property name="title">Accounts</property>
+            <property name="description">Log in with Pangolin Cloud or your self-hosted server, as in the official clients.</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwPreferencesGroup">
+            <child>
+              <object class="AdwButtonRow">
+                <property name="action-name">app.login</property>
+                <property name="start-icon-name">list-add-symbolic</property>
+                <property name="title">Add Account…</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>

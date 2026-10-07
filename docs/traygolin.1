@@ -1,0 +1,72 @@
+.TH TRAYGOLIN 1 "2026-10-07" "traygolin 0.1.0" "User Commands"
+.SH NAME
+traygolin \- unofficial Linux tray app for the Pangolin VPN client
+.SH SYNOPSIS
+.B traygolin
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+Traygolin is an unofficial GTK4/Libadwaita tray app that drives the official
+Pangolin CLI (\fBpangolin\fR). It is not affiliated with Fossorial or Pangolin.
+.PP
+The header switch connects and disconnects. The sidebar shows this device and
+each site the tunnel reaches.
+.SH OPTIONS
+.TP
+.B \-\-hide-window
+Start in the tray without showing the window.
+.TP
+.BI \-\-poll-interval " SECONDS"
+Override the status refresh interval for this process. Minimum 1.
+.TP
+.B \-\-help
+Show GTK application help.
+.SH SETTINGS
+Schema \fBio.github.lucasssvaz.Traygolin\fR:
+.TP
+.B poll-interval
+Seconds between status checks (default 5).
+.TP
+.B tray-icon
+Show the tray icon (default true).
+.TP
+.B start-at-login
+Install an XDG autostart entry.
+.TP
+.B connect-at-start
+Connect when Traygolin starts.
+.TP
+.B mtu
+WireGuard MTU passed to \fBpangolin up\fR.
+.TP
+.B holepunch
+Enable NAT holepunching on connect.
+.TP
+.B disable-relay
+Do not fall back to relaying.
+.SH PRIVILEGES
+The Pangolin CLI starts its tunnel through \fBsudo\fR. When run by Traygolin,
+that call reaches Traygolin, which validates it and runs
+\fI/usr/lib/traygolin/traygolin-helper\fR through \fBpkexec\fR(1). The polkit
+action \fBio.github.lucasssvaz.Traygolin.tunnel\fR allows the active local user to do
+this without a password.
+.SH FILES
+.TP
+.I /var/run/olm.sock
+Local control socket of the running tunnel.
+.TP
+.I ~/.config/pangolin/config.json
+Pangolin CLI configuration (DNS and routing preferences).
+.TP
+.I ~/.config/pangolin/accounts.json
+Saved CLI accounts. Traygolin never copies the secrets in this file.
+.TP
+.I ~/.config/pangolin/logs/client.log
+Client log shown in View Logs.
+.TP
+.I ~/.config/autostart/io.github.lucasssvaz.Traygolin.desktop
+Written when Start at Login is enabled.
+.SH SEE ALSO
+.BR pkexec (1),
+.BR polkit (8)
+.PP
+Documentation in the source tree under \fIdocs/\fR.

@@ -1,0 +1,92 @@
+name: AUR
+
+# Called by the Release workflow after a tag is published. Run it by hand
+# to republish: with a version it updates traygolin-bin to that release,
+# and it always syncs traygolin-git.
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      sha256:
+        description: Checksum of the release tarball as built by the Release job.
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release to publish as traygolin-bin, without the leading v. Leave empty to only sync traygolin-git.
+        type: string
+        required: false
+
+jobs:
+  aur:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed git openssh
+      - uses: actions/checkout@v4
+      - name: Publish to AUR
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          VERSION: ${{ inputs.version }}
+          EXPECTED_SHA256: ${{ inputs.sha256 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AUR_SSH_PRIVATE_KEY:-}" ]; then
+            echo "AUR_SSH_PRIVATE_KEY is not set; skipping AUR publish."
+            exit 0
+          fi
+
+          # makepkg refuses to run as root.
+          useradd -m builder
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          cat >> ~/.ssh/config <<EOF
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/aur
+            StrictHostKeyChecking accept-new
+            User aur
+          EOF
+          git config --global --add safe.directory '*'
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          publish() {
+            pkg="$1" msg="$2"
+            dir="/tmp/aur-${pkg}"
+            git clone "ssh://aur@aur.archlinux.org/${pkg}.git" "$dir"
+            cp "packaging/aur/${pkg}/PKGBUILD" "$dir/PKGBUILD"
+            if [ "$pkg" = traygolin-bin ]; then
+              base="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}"
+              tarball="traygolin-${VERSION}-linux-amd64.tar.gz"
+              expected="${EXPECTED_SHA256:-}"
+              if [ -z "$expected" ]; then
+                expected="$(curl -fsSL "${base}/SHA256SUMS" | awk -v f="$tarball" '$2 == f {print $1}')"
+              fi
+              sum="$(curl -fsSL "${base}/${tarball}" | sha256sum | cut -d' ' -f1)"
+              if ! [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || [ "$sum" != "$expected" ]; then
+                echo "::error::${tarball} checksum ${sum} does not match the release's ${expected:-<missing>}"
+                exit 1
+              fi
+              sed -i "s/^pkgver=.*/pkgver=${VERSION}/;s/^pkgrel=.*/pkgrel=1/;s/^sha256sums=.*/sha256sums=('${sum}')/" "$dir/PKGBUILD"
+              grep -qx "sha256sums=('${sum}')" "$dir/PKGBUILD"
+            fi
+            chown -R builder "$dir"
+            su builder -c "cd '$dir' && makepkg --printsrcinfo > .SRCINFO"
+            git -C "$dir" add PKGBUILD .SRCINFO
+            if git -C "$dir" diff --cached --quiet; then
+              echo "${pkg}: no changes"
+              return
+            fi
+            git -C "$dir" commit -m "$msg"
+            git -C "$dir" push origin HEAD:master
+          }
+
+          if [ -n "${VERSION}" ]; then
+            publish traygolin-bin "Update to v${VERSION}"
+          fi
+          publish traygolin-git "Sync PKGBUILD from ${GITHUB_SHA::7}"

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="io.github.lucasssvaz.Traygolin" path="/io/github/lucasssvaz/Traygolin/">
+    <key name="poll-interval" type="i">
+      <default>5</default>
+      <range min="1" max="3600"/>
+      <summary>Status poll interval</summary>
+      <description>Seconds between tunnel status checks. Minimum is 1. Traygolin checks every second while connecting.</description>
+    </key>
+    <key name="tray-icon" type="b">
+      <default>true</default>
+      <summary>Show tray icon</summary>
+      <description>Show Traygolin in the system tray.</description>
+    </key>
+    <key name="start-at-login" type="b">
+      <default>false</default>
+      <summary>Start at login</summary>
+      <description>Install an XDG autostart entry so Traygolin opens when you log in.</description>
+    </key>
+    <key name="connect-at-start" type="b">
+      <default>false</default>
+      <summary>Connect at start</summary>
+      <description>Connect when Traygolin starts, if you are already logged in.</description>
+    </key>
+    <key name="mtu" type="i">
+      <default>1280</default>
+      <range min="576" max="9000"/>
+      <summary>WireGuard MTU</summary>
+      <description>Maximum transmission unit for the Pangolin tunnel interface, passed to pangolin up.</description>
+    </key>
+    <key name="holepunch" type="b">
+      <default>true</default>
+      <summary>Enable holepunching</summary>
+      <description>Allow NAT holepunching when bringing the tunnel up.</description>
+    </key>
+    <key name="disable-relay" type="b">
+      <default>false</default>
+      <summary>Disable relay</summary>
+      <description>Do not fall back to relaying if a direct path cannot be established.</description>
+    </key>
+  </schema>
+</schemalist>

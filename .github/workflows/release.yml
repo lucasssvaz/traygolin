@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make tar
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+      sha256: ${{ steps.build.outputs.sha256 }}
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
+      - uses: actions/checkout@v4
+      - name: Build
+        id: build
+        env:
+          CGO_ENABLED: "1"
+          GOFLAGS: -buildmode=pie -trimpath -mod=readonly -modcacherw
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          VERSION="${GITHUB_REF_NAME#v}"
+          make VERSION="${VERSION}" GO_LDFLAGS="-linkmode=external" DESTDIR="$PWD/stage" PREFIX=/usr install
+          test ! -e stage/usr/share/glib-2.0/schemas/gschemas.compiled
+          tar -C stage --owner=0 --group=0 -czf "traygolin-${VERSION}-linux-amd64.tar.gz" usr
+          sha256sum "traygolin-${VERSION}-linux-amd64.tar.gz" > SHA256SUMS
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(cut -d' ' -f1 SHA256SUMS)" >> "$GITHUB_OUTPUT"
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            Linux x86_64 build (GTK 4 / Libadwaita 1.9) staged with `make install PREFIX=/usr`.
+            It contains the app, the privileged helper in /usr/lib/traygolin and
+            the polkit action. On Arch Linux, install `traygolin-bin` or
+            `traygolin-git` from the AUR instead.
+
+            Docs: docs/install.md, docs/usage.md
+          files: |
+            traygolin-*-linux-amd64.tar.gz
+            SHA256SUMS
+
+  aur:
+    needs: release
+    uses: ./.github/workflows/aur.yml
+    with:
+      version: ${{ needs.release.outputs.version }}
+      sha256: ${{ needs.release.outputs.sha256 }}
+    secrets: inherit

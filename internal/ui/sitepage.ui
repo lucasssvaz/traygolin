@@ -1,0 +1,101 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--
+  Copyright 2026 Lucas Saavedra Vaz. Apache License 2.0.
+  Portions Copyright (c) 2025 DeedleFake, MIT License; see LICENSES/MIT-Trayscale.txt
+-->
+<interface>
+  <requires lib="gtk" version="4.18"/>
+  <requires lib="libadwaita" version="1.6"/>
+  <object class="AdwStatusPage" id="Page">
+    <property name="icon-name">network-server-symbolic</property>
+    <child>
+      <object class="AdwClamp">
+        <child>
+          <object class="GtkBox">
+            <property name="orientation">vertical</property>
+            <property name="spacing">18</property>
+            <child>
+              <object class="AdwPreferencesGroup">
+                <property name="title">Connection</property>
+                <child>
+                  <object class="AdwActionRow">
+                    <property name="title">Connected</property>
+                    <child>
+                      <object class="GtkImage" id="Connected"/>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="ModeRow">
+                    <property name="title">Path</property>
+                    <property name="css-classes">property</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="LatencyRow">
+                    <property name="title">Latency</property>
+                    <property name="css-classes">property</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="LastSeenRow">
+                    <property name="title">Last handshake</property>
+                    <property name="css-classes">property</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup">
+                <property name="title">Addresses</property>
+                <child>
+                  <object class="AdwActionRow" id="EndpointRow">
+                    <property name="title">Endpoint</property>
+                    <property name="css-classes">property</property>
+                    <child type="suffix">
+                      <object class="GtkButton">
+                        <property name="action-name">page.copy-endpoint</property>
+                        <property name="icon-name">edit-copy-symbolic</property>
+                        <property name="tooltip-text">Copy</property>
+                        <property name="valign">center</property>
+                        <property name="css-classes">flat</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="AdwActionRow" id="PeerAddressRow">
+                    <property name="title">Peer address</property>
+                    <property name="css-classes">property</property>
+                    <child type="suffix">
+                      <object class="GtkButton">
+                        <property name="action-name">page.copy-address</property>
+                        <property name="icon-name">edit-copy-symbolic</property>
+                        <property name="tooltip-text">Copy</property>
+                        <property name="valign">center</property>
+                        <property name="css-classes">flat</property>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="AdwPreferencesGroup">
+                <property name="title">Routing</property>
+                <child>
+                  <object class="AdwActionRow">
+                    <property name="title">Used as exit node</property>
+                    <child>
+                      <object class="GtkImage" id="ExitNode"/>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
