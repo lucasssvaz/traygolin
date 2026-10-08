@@ -6,8 +6,8 @@ on:
       - "v*"
 
 env:
-  ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make tar xorg-server-xvfb dbus
-  UBUNTU_DEPS: ca-certificates golang-go gcc libc6-dev pkg-config make git libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev gobject-introspection gir1.2-gtk-4.0 gir1.2-adw-1 dpkg-dev xvfb dbus-x11
+  ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make tar xorg-server-xvfb dbus desktop-file-utils
+  UBUNTU_DEPS: ca-certificates golang-go gcc libc6-dev pkg-config make git libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev gobject-introspection gir1.2-gtk-4.0 gir1.2-adw-1 dpkg-dev xvfb dbus-x11 desktop-file-utils
   GOCACHE: /github/home/.cache/go-build
   GOMODCACHE: /github/home/go/pkg/mod
 
@@ -83,26 +83,24 @@ jobs:
               test -f "traygolin_${VERSION}-1_${{ matrix.cpu }}.deb"
               ;;
           esac
-      - name: Smoke-run binaries
+      - name: Install package and smoke-test
         env:
           GSK_RENDERER: cairo
           GDK_BACKEND: x11
+          DEBIAN_FRONTEND: noninteractive
         run: |
           set -euo pipefail
-          bin=./bin/traygolin
-          helper=./bin/traygolin-helper
-          if [ "${{ matrix.kind }}" = tarball ]; then
-            bin=./stage/usr/bin/traygolin
-            helper=./stage/usr/lib/traygolin/traygolin-helper
-          fi
-          xvfb-run -a dbus-run-session -- "$bin" --help | tee /tmp/traygolin-help.out
-          grep -q -- '--hide-window' /tmp/traygolin-help.out
-          if "$helper" 2>/tmp/helper.err; then
-            echo "traygolin-helper should refuse to run without pkexec"
-            cat /tmp/helper.err
-            exit 1
-          fi
-          grep -q 'PKEXEC_UID is not set' /tmp/helper.err
+          VERSION="${GITHUB_REF_NAME#v}"
+          case "${{ matrix.kind }}" in
+            tarball)
+              tar -C / -xzf "traygolin-${VERSION}-linux-${{ matrix.cpu }}.tar.gz"
+              glib-compile-schemas /usr/share/glib-2.0/schemas
+              ;;
+            deb)
+              apt-get install -y "./traygolin_${VERSION}-1_${{ matrix.cpu }}.deb"
+              ;;
+          esac
+          bash packaging/smoke-installed.sh
       - uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.os }}-${{ matrix.cpu }}

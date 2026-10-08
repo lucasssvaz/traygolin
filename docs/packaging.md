@@ -94,3 +94,11 @@ leave the version empty to sync only `traygolin-git`.
 It needs an `AUR_SSH_PRIVATE_KEY` repository secret whose public key is on your
 AUR account. Without the secret it skips publishing and succeeds. The first
 push creates each AUR package.
+
+## Post-publish install tests
+
+CI and Release install the just-built package into `/usr` and run
+`packaging/smoke-installed.sh`: files under `/usr`, `traygolin --help`, the
+helper refusing to run without pkexec, and a few seconds of
+`traygolin --hide-window` under xvfb. After apt and AUR publish, the same
+script runs again against a user-style install (amd64 and arm64).

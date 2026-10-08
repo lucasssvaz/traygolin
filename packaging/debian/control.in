@@ -6,7 +6,7 @@ Section: net
 Priority: optional
 Homepage: https://github.com/lucasssvaz/traygolin
 Installed-Size: @INSTALLED_SIZE@
-Depends: libc6, libgtk-4-1, libadwaita-1-0 (>= 1.9), libglib2.0-0t64 | libglib2.0-0, pkexec, polkitd, hicolor-icon-theme
+Depends: libc6, libgtk-4-1, libadwaita-1-0 (>= 1.9), libglib2.0-0t64 | libglib2.0-0, libglib2.0-bin, libgirepository-1.0-1, pkexec, polkitd, hicolor-icon-theme
 Description: unofficial Linux tray app for the Pangolin VPN client
  Traygolin is a GTK4 and Libadwaita application that drives the official
  pangolin CLI: connect, accounts, exit node, DNS and routing, without a

@@ -46,11 +46,15 @@ test job runs in containers: `archlinux:latest` and `ubuntu:26.04`. Each distro
 has its own Go build cache. Jobs: `make`, a smoke run of `traygolin --help` and
 `traygolin-helper` under xvfb, tests (GTK packages under xvfb, everything else
 with `-race`), a staged `make install`, golangci-lint (Arch), and AppStream
-metainfo validation. The Ubuntu job also builds a `.deb`. Release builds run the
-same smoke check on the staged or packaged binaries.
+metainfo validation. The Ubuntu job also builds a `.deb`. After that, CI
+installs the package (`make PREFIX=/usr install` on Arch, the `.deb` on
+Ubuntu) and runs `packaging/smoke-installed.sh`. Release does the same to
+the tarball or `.deb` it just built.
 
 Tagging `v*` runs the Release workflow: Arch and Ubuntu packages for amd64 and
-arm64, a GitHub release, then apt (Pages) and AUR in parallel. Apt and AUR can
+arm64, a GitHub release, then apt (Pages) and AUR in parallel. Each publisher
+then installs its packages (apt on Ubuntu 26.04, `traygolin-bin` from the AUR
+on Arch) on amd64 and arm64 and smoke-tests the installed app. Apt and AUR can
 also be run by hand from their workflow files.
 
 A cold gotk4 compile takes most of a CI job, so the Go build and module caches

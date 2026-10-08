@@ -96,7 +96,11 @@ jobs:
                 expected_amd64="$(printf '%s\n' "$sums" | awk -v f="$tarball_amd64" '$2 == f {print $1}')"
               fi
               sum_amd64="$(verify "$tarball_amd64" "$expected_amd64")"
-              sed -i "s/^pkgver=.*/pkgver=${VERSION}/;s/^pkgrel=.*/pkgrel=1/;s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${sum_amd64}')/" "$dir/PKGBUILD"
+              oldver=$(awk -F= '/^pkgver=/ {print $2; exit}' "$dir/PKGBUILD")
+              if [ "$oldver" != "$VERSION" ]; then
+                sed -i "s/^pkgver=.*/pkgver=${VERSION}/;s/^pkgrel=.*/pkgrel=1/" "$dir/PKGBUILD"
+              fi
+              sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${sum_amd64}')/" "$dir/PKGBUILD"
               grep -qx "sha256sums_x86_64=('${sum_amd64}')" "$dir/PKGBUILD"
               expected_arm64="${EXPECTED_SHA256_ARM64:-}"
               if [ -z "$expected_arm64" ]; then
@@ -125,3 +129,49 @@ jobs:
             publish traygolin-bin "Update to v${VERSION}"
           fi
           publish traygolin-git "Sync PKGBUILD from ${GITHUB_SHA::7}"
+
+  verify:
+    name: install aur (${{ matrix.cpu }})
+    needs: aur
+    if: ${{ inputs.version != '' }}
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cpu: amd64
+            runner: ubuntu-latest
+            container: archlinux:latest
+          - cpu: arm64
+            runner: ubuntu-24.04-arm
+            container: ghcr.io/fwcd/archlinux
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install traygolin-bin from AUR
+        run: |
+          set -euo pipefail
+          pacman -Syu --noconfirm --needed base-devel git gtk4 libadwaita polkit \
+            hicolor-icon-theme xorg-server-xvfb dbus sudo desktop-file-utils
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder
+          su - builder -c 'set -euo pipefail
+            ok=
+            for _ in 1 2 3 4 5 6; do
+              if git clone --depth 1 https://aur.archlinux.org/traygolin-bin.git "$HOME/traygolin-bin"; then
+                ok=1
+                break
+              fi
+              rm -rf "$HOME/traygolin-bin"
+              sleep 10
+            done
+            test -n "$ok"
+            cd "$HOME/traygolin-bin"
+            makepkg -si --noconfirm'
+          pacman -Qi traygolin-bin
+      - name: Smoke-test installed package
+        env:
+          GSK_RENDERER: cairo
+          GDK_BACKEND: x11
+        run: bash packaging/smoke-installed.sh
