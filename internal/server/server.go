@@ -228,10 +228,10 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 	}
 	var env envelope
 	parseErr := json.Unmarshal(body, &env)
-	switch {
-	case resp.StatusCode == http.StatusUnauthorized:
+	switch resp.StatusCode {
+	case http.StatusUnauthorized:
 		return ErrUnauthorized
-	case resp.StatusCode == http.StatusForbidden:
+	case http.StatusForbidden:
 		// Pangolin also answers 403 when the user may not see something.
 		// That is not an expired session, so say what the server said.
 		if parseErr == nil && env.Message != "" {
