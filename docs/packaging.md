@@ -85,8 +85,8 @@ signs `InRelease`.
 
 After the GitHub release job, the same Release workflow calls `.github/workflows/aur.yml`.
 It sets `traygolin-bin` to the new version and checksum, syncs the
-`traygolin-git` PKGBUILD, regenerates `.SRCINFO` with `makepkg`, and pushes
-only when something changed. The checksum comes from the release job (or the
+`traygolin-git` PKGBUILD, fetches that git source so `pkgver()` can run,
+regenerates `.SRCINFO` with `makepkg`, and pushes only when something changed. The checksum comes from the release job (or the
 release's `SHA256SUMS` when run by hand), and publishing fails if the
 downloaded tarball does not match it. Run it by hand from the Actions tab to republish;
 leave the version empty to sync only `traygolin-git`.

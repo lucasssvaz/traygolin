@@ -39,6 +39,19 @@ Install `traygolin-bin` using an AUR helper such as `paru`:
 paru -S traygolin-bin
 ```
 
+If you previously ran `sudo make install`, pacman will stop with "conflicting files" for `/usr/lib/traygolin/traygolin-helper` and the polkit policy. Remove the manual install first, from the source tree you installed from:
+
+```bash
+sudo make uninstall
+```
+
+Or delete the two files by hand:
+
+```bash
+sudo rm /usr/lib/traygolin/traygolin-helper \
+  /usr/share/polkit-1/actions/io.github.lucasssvaz.Traygolin.policy
+```
+
 #### Ubuntu 26.04 or later (Apt repository)
 
 Add the signed repository and install the package:

@@ -68,6 +68,7 @@ jobs:
           chmod 600 ~/.ssh/config
           export GIT_SSH_COMMAND="ssh -F $HOME/.ssh/config -o IdentitiesOnly=yes"
           git config --global --add safe.directory '*'
+          git config --system --add safe.directory '*'
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
@@ -115,6 +116,12 @@ jobs:
               fi
             fi
             chown -R builder "$dir"
+            # --printsrcinfo does not clone VCS sources, so pkgver() never
+            # runs and paru keeps showing the PKGBUILD placeholder. Fetch
+            # first so git describe can rewrite pkgver.
+            if [ "$pkg" = traygolin-git ]; then
+              su builder -c "cd '$dir' && makepkg --nobuild --nodeps"
+            fi
             su builder -c "cd '$dir' && makepkg --printsrcinfo > .SRCINFO"
             git -C "$dir" add PKGBUILD .SRCINFO
             if git -C "$dir" diff --cached --quiet; then
