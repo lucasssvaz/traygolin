@@ -10,9 +10,14 @@ on:
         type: string
         required: true
       sha256:
-        description: Checksum of the release tarball as built by the Release job.
+        description: Checksum of the amd64 Arch tarball as built by the Release job.
         type: string
         required: true
+      sha256_arm64:
+        description: Checksum of the arm64 Arch tarball, if the release includes one.
+        type: string
+        required: false
+        default: ""
   workflow_dispatch:
     inputs:
       version:
@@ -33,6 +38,7 @@ jobs:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           VERSION: ${{ inputs.version }}
           EXPECTED_SHA256: ${{ inputs.sha256 }}
+          EXPECTED_SHA256_ARM64: ${{ inputs.sha256_arm64 }}
         run: |
           set -euo pipefail
           if [ -z "${AUR_SSH_PRIVATE_KEY:-}" ]; then
@@ -62,18 +68,37 @@ jobs:
             cp "packaging/aur/${pkg}/PKGBUILD" "$dir/PKGBUILD"
             if [ "$pkg" = traygolin-bin ]; then
               base="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}"
-              tarball="traygolin-${VERSION}-linux-amd64.tar.gz"
-              expected="${EXPECTED_SHA256:-}"
-              if [ -z "$expected" ]; then
-                expected="$(curl -fsSL "${base}/SHA256SUMS" | awk -v f="$tarball" '$2 == f {print $1}')"
+              sums="$(curl -fsSL "${base}/SHA256SUMS")"
+              verify() {
+                local name="$1" expected="$2"
+                local sum
+                sum="$(curl -fsSL "${base}/${name}" | sha256sum | cut -d' ' -f1)"
+                if ! [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || [ "$sum" != "$expected" ]; then
+                  echo "::error::${name} checksum ${sum} does not match the release's ${expected:-<missing>}"
+                  exit 1
+                fi
+                printf '%s' "$sum"
+              }
+              tarball_amd64="traygolin-${VERSION}-linux-amd64.tar.gz"
+              tarball_arm64="traygolin-${VERSION}-linux-arm64.tar.gz"
+              expected_amd64="${EXPECTED_SHA256:-}"
+              if [ -z "$expected_amd64" ]; then
+                expected_amd64="$(printf '%s\n' "$sums" | awk -v f="$tarball_amd64" '$2 == f {print $1}')"
               fi
-              sum="$(curl -fsSL "${base}/${tarball}" | sha256sum | cut -d' ' -f1)"
-              if ! [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || [ "$sum" != "$expected" ]; then
-                echo "::error::${tarball} checksum ${sum} does not match the release's ${expected:-<missing>}"
-                exit 1
+              sum_amd64="$(verify "$tarball_amd64" "$expected_amd64")"
+              sed -i "s/^pkgver=.*/pkgver=${VERSION}/;s/^pkgrel=.*/pkgrel=1/;s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${sum_amd64}')/" "$dir/PKGBUILD"
+              grep -qx "sha256sums_x86_64=('${sum_amd64}')" "$dir/PKGBUILD"
+              expected_arm64="${EXPECTED_SHA256_ARM64:-}"
+              if [ -z "$expected_arm64" ]; then
+                expected_arm64="$(printf '%s\n' "$sums" | awk -v f="$tarball_arm64" '$2 == f {print $1}')"
               fi
-              sed -i "s/^pkgver=.*/pkgver=${VERSION}/;s/^pkgrel=.*/pkgrel=1/;s/^sha256sums=.*/sha256sums=('${sum}')/" "$dir/PKGBUILD"
-              grep -qx "sha256sums=('${sum}')" "$dir/PKGBUILD"
+              if [[ "$expected_arm64" =~ ^[0-9a-f]{64}$ ]] && curl -fsSLI "${base}/${tarball_arm64}" >/dev/null; then
+                sum_arm64="$(verify "$tarball_arm64" "$expected_arm64")"
+                sed -i "s/^sha256sums_aarch64=.*/sha256sums_aarch64=('${sum_arm64}')/" "$dir/PKGBUILD"
+                grep -qx "sha256sums_aarch64=('${sum_arm64}')" "$dir/PKGBUILD"
+              else
+                sed -i "s/arch=('x86_64' 'aarch64')/arch=('x86_64')/;/^source_aarch64=/d;/^sha256sums_aarch64=/d" "$dir/PKGBUILD"
+              fi
             fi
             chown -R builder "$dir"
             su builder -c "cd '$dir' && makepkg --printsrcinfo > .SRCINFO"

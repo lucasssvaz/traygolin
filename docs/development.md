@@ -43,9 +43,15 @@ The first gotk4 compile is slow (cgo against GTK). Later builds use the Go cache
 
 GitHub Actions host runners may still be Ubuntu 24.04 (Libadwaita 1.5), so the
 test job runs in containers: `archlinux:latest` and `ubuntu:26.04`. Each distro
-has its own Go build cache. Jobs: `make`, tests (GTK packages under xvfb,
-everything else with `-race`), a staged `make install`, golangci-lint (Arch),
-and AppStream metainfo validation.
+has its own Go build cache. Jobs: `make`, a smoke run of `traygolin --help` and
+`traygolin-helper` under xvfb, tests (GTK packages under xvfb, everything else
+with `-race`), a staged `make install`, golangci-lint (Arch), and AppStream
+metainfo validation. The Ubuntu job also builds a `.deb`. Release builds run the
+same smoke check on the staged or packaged binaries.
+
+Tagging `v*` runs the Release workflow: Arch and Ubuntu packages for amd64 and
+arm64, then AUR publish. A separate Pages workflow rebuilds the apt repo from
+those `.deb` assets.
 
 A cold gotk4 compile takes most of a CI job, so the Go build and module caches
 are saved between runs, keyed on the distro, Go version, and `go.sum`. The first

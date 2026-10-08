@@ -16,8 +16,8 @@ concurrency:
 # Compiling gotk4's cgo bindings from scratch takes most of a job, so the Go
 # build cache is restored between runs and gotk4 is only built one way per job.
 env:
-  ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make xorg-server-xvfb
-  UBUNTU_DEPS: ca-certificates golang-go gcc libc6-dev pkg-config make git libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev gobject-introspection gir1.2-gtk-4.0 gir1.2-adw-1 xvfb
+  ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make xorg-server-xvfb dbus
+  UBUNTU_DEPS: ca-certificates golang-go gcc libc6-dev pkg-config make git libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev gobject-introspection gir1.2-gtk-4.0 gir1.2-adw-1 xvfb dbus-x11 dpkg-dev
   GOCACHE: /github/home/.cache/go-build
   GOMODCACHE: /github/home/go/pkg/mod
 
@@ -70,6 +70,26 @@ jobs:
           make
           test -x bin/traygolin
           test -x bin/traygolin-helper
+      - name: Smoke-run binaries
+        env:
+          GSK_RENDERER: cairo
+          GDK_BACKEND: x11
+        run: |
+          set -euo pipefail
+          xvfb-run -a dbus-run-session -- ./bin/traygolin --help | tee /tmp/traygolin-help.out
+          grep -q -- '--hide-window' /tmp/traygolin-help.out
+          if ./bin/traygolin-helper 2>/tmp/helper.err; then
+            echo "traygolin-helper should refuse to run without pkexec"
+            cat /tmp/helper.err
+            exit 1
+          fi
+          grep -q 'PKEXEC_UID is not set' /tmp/helper.err
+          if PKEXEC_UID=0 ./bin/traygolin-helper 2>/tmp/helper-usage.err; then
+            echo "traygolin-helper should fail without a command"
+            cat /tmp/helper-usage.err
+            exit 1
+          fi
+          grep -q 'usage: traygolin-helper' /tmp/helper-usage.err
       - name: Test GTK packages
         run: |
           xvfb-run -a go test $(go list -f '{{.ImportPath}} {{join .Deps " "}}' ./... | awk '/diamondburned\/gotk4/ {print $1}')
@@ -84,6 +104,11 @@ jobs:
           test -x stage/usr/lib/traygolin/traygolin-helper
           test ! -e stage/usr/share/glib-2.0/schemas/gschemas.compiled
           grep -q '/usr/lib/traygolin/traygolin-helper' stage/usr/share/polkit-1/actions/io.github.lucasssvaz.Traygolin.policy
+      - name: Build .deb
+        if: matrix.os == 'ubuntu'
+        run: |
+          bash packaging/debian/build-deb.sh
+          dpkg-deb -I traygolin_*.deb
 
   lint:
     name: golangci-lint

@@ -32,11 +32,21 @@ curl -fsSL https://static.pangolin.net/get-cli.sh | bash
 ### AUR (Arch Linux)
 
 ```bash
-paru -S traygolin-bin    # prebuilt release (x86_64)
+paru -S traygolin-bin    # prebuilt release (x86_64 and aarch64)
 paru -S traygolin-git    # built from the latest commit
 ```
 
 ### Ubuntu 26.04 or later
+
+```bash
+echo 'deb [trusted=yes] https://lucasssvaz.github.io/traygolin stable main' \
+  | sudo tee /etc/apt/sources.list.d/traygolin.list
+sudo apt update
+sudo apt install traygolin
+```
+
+amd64 and arm64 packages are published. Ubuntu 24.04 LTS cannot be used; see
+[docs/install.md](docs/install.md). To build from source, install:
 
 ```bash
 sudo apt install golang-go gcc pkg-config make git \
@@ -45,9 +55,7 @@ sudo apt install golang-go gcc pkg-config make git \
   pkexec polkitd
 ```
 
-Then follow **From source** below. Ubuntu 24.04 LTS cannot be used: it ships
-Libadwaita 1.5 / GTK 4.14, and Libadwaita 1.9 needs GTK 4.21 and GLib 2.84.
-See [docs/install.md](docs/install.md).
+then follow **From source** below.
 
 ### From source
 

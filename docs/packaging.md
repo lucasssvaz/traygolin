@@ -30,8 +30,9 @@ and `polkitd`.
 Templates:
 
 - [`packaging/aur/traygolin-bin/`](../packaging/aur/traygolin-bin/): repackages
-  the x86_64 tarball from the GitHub release. AUR rules require the `-bin`
-  suffix for prebuilt packages, so there is no plain `traygolin`.
+  the `linux-amd64` and `linux-arm64` tarballs from the GitHub release. AUR
+  rules require the `-bin` suffix for prebuilt packages, so there is no plain
+  `traygolin`.
 - [`packaging/aur/traygolin-git/`](../packaging/aur/traygolin-git/): builds the
   latest commit with Arch's recommended Go flags (PIE, `-trimpath`, external
   linking).
@@ -43,11 +44,33 @@ Trayscale-derived files.
 The AUR git repositories must contain only `PKGBUILD` and `.SRCINFO`.
 Regenerate `.SRCINFO` with `makepkg --printsrcinfo` after editing a PKGBUILD.
 
+## Debian package
+
+`packaging/debian/build-deb.sh` (or `make deb`) stages `PREFIX=/usr` and wraps
+it with `dpkg-deb`. Run it on Ubuntu 26.04+ so the binaries link that distro's
+GTK. Maintainer scripts compile GSettings schemas and refresh the icon and
+desktop databases.
+
 ## GitHub Releases
 
-Tagging `vX.Y.Z` builds in an Arch Linux container and publishes
-`traygolin-X.Y.Z-linux-amd64.tar.gz`, the staged `make install PREFIX=/usr`
-tree, with a `SHA256SUMS` file. `traygolin-bin` installs that tarball as is.
+Tagging `vX.Y.Z` builds four artifacts (fail-fast is off, so one arch can fail
+without blocking the others):
+
+| File | Built on |
+| --- | --- |
+| `traygolin-X.Y.Z-linux-amd64.tar.gz` | `archlinux:latest` |
+| `traygolin-X.Y.Z-linux-arm64.tar.gz` | `ghcr.io/fwcd/archlinux` on `ubuntu-24.04-arm` (Arch Linux ARM; the official Arch image is amd64-only) |
+| `traygolin_X.Y.Z-1_amd64.deb` | `ubuntu:26.04` |
+| `traygolin_X.Y.Z-1_arm64.deb` | `ubuntu:26.04` on `ubuntu-24.04-arm` |
+
+`traygolin-bin` installs the Arch tarball for the machine's CARCH.
+
+## Apt repository (GitHub Pages)
+
+`.github/workflows/pages.yml` runs after a release (and from **workflow_dispatch**).
+It downloads every `*.deb` from GitHub Releases, builds `dists/stable` with
+`dpkg-scanpackages`, and deploys to GitHub Pages. Enable Pages with source
+**GitHub Actions**. Optional secret `APT_GPG_PRIVATE_KEY` signs `InRelease`.
 
 ## AUR publishing
 

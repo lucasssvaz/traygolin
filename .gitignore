@@ -1,6 +1,7 @@
 /bin/
 /dist/
 /traygolin
+/traygolin_*.deb
 *.syso
 gschemas.compiled
 .cache/

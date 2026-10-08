@@ -1,0 +1,53 @@
+name: Apt repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  apt:
+    name: publish apt repo
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v5
+      - name: Collect debs and generate repo
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils dpkg-dev gnupg python3
+          mkdir -p debs
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isDraft \
+            --jq '.[] | select(.isDraft|not) | .tagName' | while read -r tag; do
+            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*.deb' --dir debs --clobber || true
+          done
+          if ! ls debs/*.deb >/dev/null 2>&1; then
+            echo "::error::No .deb assets on any GitHub release. Tag a v* release that builds Ubuntu packages first."
+            exit 1
+          fi
+          owner=${GITHUB_REPOSITORY%/*}
+          name=${GITHUB_REPOSITORY#*/}
+          base="https://${owner}.github.io/${name}"
+          bash packaging/apt/generate-repo.sh "$PWD/debs" "$PWD/public" "$base"
+          find public -type f | sort
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deploy
+        uses: actions/deploy-pages@v4

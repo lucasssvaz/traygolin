@@ -6,55 +6,162 @@ on:
       - "v*"
 
 env:
-  ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make tar
+  ARCH_DEPS: go gtk4 libadwaita gobject-introspection pkgconf gcc git make tar xorg-server-xvfb dbus
+  UBUNTU_DEPS: ca-certificates golang-go gcc libc6-dev pkg-config make git libgtk-4-dev libadwaita-1-dev libgirepository1.0-dev gobject-introspection gir1.2-gtk-4.0 gir1.2-adw-1 dpkg-dev xvfb dbus-x11
+  GOCACHE: /github/home/.cache/go-build
+  GOMODCACHE: /github/home/go/pkg/mod
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    container: archlinux:latest
+  build:
+    name: build (${{ matrix.os }} ${{ matrix.cpu }})
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
     timeout-minutes: 60
-    permissions:
-      contents: write
-    outputs:
-      version: ${{ steps.build.outputs.version }}
-      sha256: ${{ steps.build.outputs.sha256 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: arch
+            cpu: amd64
+            runner: ubuntu-latest
+            container: archlinux:latest
+            kind: tarball
+          # Official archlinux images are amd64-only; this is Arch Linux ARM.
+          - os: arch
+            cpu: arm64
+            runner: ubuntu-24.04-arm
+            container: ghcr.io/fwcd/archlinux
+            kind: tarball
+          - os: ubuntu
+            cpu: amd64
+            runner: ubuntu-latest
+            container: ubuntu:26.04
+            kind: deb
+          - os: ubuntu
+            cpu: arm64
+            runner: ubuntu-24.04-arm
+            container: ubuntu:26.04
+            kind: deb
     steps:
       - name: Install dependencies
-        run: pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
+        run: |
+          case "${{ matrix.os }}" in
+            arch)
+              pacman -Syu --noconfirm --needed ${{ env.ARCH_DEPS }}
+              ;;
+            ubuntu)
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends ${{ env.UBUNTU_DEPS }}
+              ;;
+          esac
       - uses: actions/checkout@v7
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: go-release-${{ matrix.os }}-${{ matrix.cpu }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-release-${{ matrix.os }}-${{ matrix.cpu }}-
       - name: Build
-        id: build
         env:
           CGO_ENABLED: "1"
           GOFLAGS: -buildmode=pie -trimpath -mod=readonly -modcacherw
         run: |
+          set -euo pipefail
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           VERSION="${GITHUB_REF_NAME#v}"
-          make VERSION="${VERSION}" GO_LDFLAGS="-linkmode=external" DESTDIR="$PWD/stage" PREFIX=/usr install
-          test ! -e stage/usr/share/glib-2.0/schemas/gschemas.compiled
-          tar -C stage --owner=0 --group=0 -czf "traygolin-${VERSION}-linux-amd64.tar.gz" usr
-          sha256sum "traygolin-${VERSION}-linux-amd64.tar.gz" > SHA256SUMS
+          export VERSION
+          case "${{ matrix.kind }}" in
+            tarball)
+              make VERSION="${VERSION}" GO_LDFLAGS="-linkmode=external" DESTDIR="$PWD/stage" PREFIX=/usr install
+              test ! -e stage/usr/share/glib-2.0/schemas/gschemas.compiled
+              tar -C stage --owner=0 --group=0 -czf "traygolin-${VERSION}-linux-${{ matrix.cpu }}.tar.gz" usr
+              ;;
+            deb)
+              bash packaging/debian/build-deb.sh
+              test -f "traygolin_${VERSION}-1_${{ matrix.cpu }}.deb"
+              ;;
+          esac
+      - name: Smoke-run binaries
+        env:
+          GSK_RENDERER: cairo
+          GDK_BACKEND: x11
+        run: |
+          set -euo pipefail
+          bin=./bin/traygolin
+          helper=./bin/traygolin-helper
+          if [ "${{ matrix.kind }}" = tarball ]; then
+            bin=./stage/usr/bin/traygolin
+            helper=./stage/usr/lib/traygolin/traygolin-helper
+          fi
+          xvfb-run -a dbus-run-session -- "$bin" --help | tee /tmp/traygolin-help.out
+          grep -q -- '--hide-window' /tmp/traygolin-help.out
+          if "$helper" 2>/tmp/helper.err; then
+            echo "traygolin-helper should refuse to run without pkexec"
+            cat /tmp/helper.err
+            exit 1
+          fi
+          grep -q 'PKEXEC_UID is not set' /tmp/helper.err
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}-${{ matrix.cpu }}
+          path: |
+            traygolin-*.tar.gz
+            traygolin_*.deb
+          if-no-files-found: error
+
+  publish:
+    name: github release
+    needs: build
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.sums.outputs.version }}
+      sha256: ${{ steps.sums.outputs.sha256 }}
+      sha256_arm64: ${{ steps.sums.outputs.sha256_arm64 }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - name: Checksums
+        id: sums
+        run: |
+          set -euo pipefail
+          test -n "$(ls dist/* 2>/dev/null)"
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd dist
+          sha256sum * > ../SHA256SUMS
+          cd ..
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "sha256=$(cut -d' ' -f1 SHA256SUMS)" >> "$GITHUB_OUTPUT"
+          awk -v f="traygolin-${VERSION}-linux-amd64.tar.gz" '$2 == f {print "sha256="$1}' SHA256SUMS >> "$GITHUB_OUTPUT"
+          awk -v f="traygolin-${VERSION}-linux-arm64.tar.gz" '$2 == f {print "sha256_arm64="$1}' SHA256SUMS >> "$GITHUB_OUTPUT"
+          cat SHA256SUMS
       - name: Publish
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           body: |
-            Linux x86_64 build (GTK 4 / Libadwaita 1.9) staged with `make install PREFIX=/usr`.
-            It contains the app, the privileged helper in /usr/lib/traygolin and
-            the polkit action. On Arch Linux, install `traygolin-bin` or
-            `traygolin-git` from the AUR instead.
+            Builds of Traygolin ${{ github.ref_name }} (GTK 4 / Libadwaita 1.9).
+
+            - **Arch Linux:** `traygolin-*-linux-amd64.tar.gz` and `traygolin-*-linux-arm64.tar.gz` (staged `make install PREFIX=/usr`). Install with `traygolin-bin` or `traygolin-git` from the AUR.
+            - **Ubuntu 26.04+:** `traygolin_*-1_amd64.deb` and `traygolin_*-1_arm64.deb`, also served from the [apt repository](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/).
 
             Docs: docs/install.md, docs/usage.md
           files: |
-            traygolin-*-linux-amd64.tar.gz
+            dist/*
             SHA256SUMS
 
   aur:
-    needs: release
+    needs: publish
+    if: ${{ needs.publish.outputs.sha256 != '' }}
     uses: ./.github/workflows/aur.yml
     with:
-      version: ${{ needs.release.outputs.version }}
-      sha256: ${{ needs.release.outputs.sha256 }}
+      version: ${{ needs.publish.outputs.version }}
+      sha256: ${{ needs.publish.outputs.sha256 }}
+      sha256_arm64: ${{ needs.publish.outputs.sha256_arm64 }}
     secrets: inherit

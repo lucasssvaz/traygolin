@@ -26,7 +26,23 @@ On Arch/CachyOS:
 sudo pacman -S go gtk4 libadwaita gobject-introspection polkit
 ```
 
-On Ubuntu 26.04 or later:
+On Ubuntu 26.04 or later, install a release package from the apt repository
+(amd64 and arm64):
+
+```bash
+echo 'deb [trusted=yes] https://lucasssvaz.github.io/traygolin stable main' \
+  | sudo tee /etc/apt/sources.list.d/traygolin.list
+sudo apt update
+sudo apt install traygolin
+```
+
+Settings → Pages → Source must be **GitHub Actions** for that URL to work.
+After the first `v*` tag, `.github/workflows/pages.yml` publishes every
+`.deb` from GitHub Releases. Add an `APT_GPG_PRIVATE_KEY` repository secret
+(ASCII-armored signing key) to emit a signed `InRelease`; the install snippet
+on the Pages site then uses `signed-by=` instead of `trusted=yes`.
+
+To build from source on Ubuntu 26.04+:
 
 ```bash
 sudo apt install golang-go gcc pkg-config make git \

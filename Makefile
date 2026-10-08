@@ -14,7 +14,7 @@ LDFLAGS_GO := $(GO_LDFLAGS) \
 	-X github.com/lucasssvaz/traygolin/internal/metadata.Version=$(VERSION) \
 	-X github.com/lucasssvaz/traygolin/internal/privhelper.HelperPath=$(HELPER)
 
-.PHONY: all build test install uninstall schemas clean
+.PHONY: all build test install uninstall schemas clean deb
 
 all: build
 
@@ -61,5 +61,8 @@ uninstall:
 	rm -rf $(DESTDIR)$(LICENSEDIR)
 	[ -n "$(DESTDIR)" ] || glib-compile-schemas $(DATADIR)/glib-2.0/schemas 2>/dev/null || true
 
+deb:
+	bash packaging/debian/build-deb.sh
+
 clean:
-	rm -rf bin gschemas.compiled
+	rm -rf bin gschemas.compiled traygolin_*.deb
