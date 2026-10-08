@@ -20,6 +20,8 @@ jobs:
   apt:
     name: publish apt repo
     runs-on: ubuntu-latest
+    # github-pages is created allowing only the default branch. Release runs
+    # on tags, so Environments → github-pages must also allow tags matching v*.
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

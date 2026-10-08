@@ -75,7 +75,11 @@ follow-up run. Rebuild from the Actions tab with **Apt repository**
 
 It downloads every `*.deb` from GitHub Releases, builds `dists/stable` with
 `dpkg-scanpackages`, and deploys to GitHub Pages. Enable Pages with source
-**GitHub Actions**. Secret `APT_GPG_PRIVATE_KEY` signs `InRelease`.
+**GitHub Actions**. The `github-pages` environment must allow the default
+branch and tags matching `v*` (Settings → Environments → github-pages →
+Deployment branches and tags). GitHub's default is the default branch only,
+which rejects Release runs triggered by a tag. Secret `APT_GPG_PRIVATE_KEY`
+signs `InRelease`.
 
 ## AUR publishing
 

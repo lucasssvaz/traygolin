@@ -37,6 +37,8 @@ sudo apt install traygolin
 ```
 
 Settings → Pages → Source must be **GitHub Actions** for that URL to work.
+The `github-pages` environment also has to allow tag deployments (`v*`), or
+Release will build the repo and then be rejected.
 After the first `v*` tag, `.github/workflows/pages.yml` publishes every
 `.deb` from GitHub Releases. Add an `APT_GPG_PRIVATE_KEY` repository secret
 (ASCII-armored signing key) to emit a signed `InRelease`; the install snippet
