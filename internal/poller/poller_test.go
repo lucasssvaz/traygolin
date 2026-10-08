@@ -64,7 +64,7 @@ func fakeCLI(t *testing.T) *pangolin.Client {
 }
 
 func TestPollerPublishesAllKinds(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	var online atomic.Bool
 	online.Store(true)
 	got := make(chan Status, 16)
@@ -128,7 +128,7 @@ func TestPollerPublishesAllKinds(t *testing.T) {
 }
 
 func TestPollerNotRunningAndFast(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	p := &Poller{
 		Interval: time.Hour,
 		Olm:      olm.New(filepath.Join(t.TempDir(), "missing.sock")),
@@ -179,7 +179,7 @@ func (f *fakeServerAPI) ExitNodes(ctx context.Context, orgID string) ([]server.E
 
 func writeAccounts(t *testing.T, org string) {
 	t.Helper()
-	dir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "pangolin")
+	dir := pangolin.ConfigDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func writeAccounts(t *testing.T, org string) {
 }
 
 func TestPollerServer(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	writeAccounts(t, "home")
 	api := &fakeServerAPI{exitOrgs: make(chan string, 16)}
 	got := make(chan *ServerStatus, 16)

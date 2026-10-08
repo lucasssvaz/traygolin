@@ -62,7 +62,7 @@ func ExitChoices(st *State) ([]Choice, int) {
 			}
 		}
 	}
-	if current != 0 && selected == 0 {
+	if selected == 0 && tray.ExitNodeInUse(*st) {
 		choices = append(choices, Choice{Label: tray.ExitNodeLabel(*st)})
 		selected = len(choices) - 1
 	}
@@ -73,6 +73,23 @@ func ExitChoices(st *State) ([]Choice, int) {
 func CurrentExitNiceID(st *State) string {
 	if e, ok := st.Server.ExitNode(tray.CurrentExitNode(*st)); ok {
 		return e.NiceID
+	}
+	return ""
+}
+
+// unknownExitNode is the exit node action's state while an exit node the
+// server did not list is in use. It matches no menu item, so None is not
+// shown as chosen.
+const unknownExitNode = "\x00unknown"
+
+// ExitActionState is the state of the app.select-exit-node action: the
+// nice ID of the exit node in use, "" for None, or unknownExitNode.
+func ExitActionState(st *State) string {
+	if id := CurrentExitNiceID(st); id != "" {
+		return id
+	}
+	if tray.ExitNodeInUse(*st) {
+		return unknownExitNode
 	}
 	return ""
 }

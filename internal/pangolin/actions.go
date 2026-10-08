@@ -113,11 +113,12 @@ var newVersionRe = regexp.MustCompile(`new version is available: v?(\S+)`)
 func (c *Client) LatestVersion(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	out, err := c.command(ctx, nil, "version").CombinedOutput()
-	if err != nil {
+	cmd := c.command(ctx, nil, "version")
+	out, err := cmd.CombinedOutput()
+	if err = ignoreWaitDelay(cmd, err); err != nil {
 		return "", wrapRunError(c.bin(), []string{"version"}, string(out), "", err)
 	}
-	if m := newVersionRe.FindStringSubmatch(string(out)); m != nil {
+	if m := newVersionRe.FindStringSubmatch(reANSI.ReplaceAllString(string(out), "")); m != nil {
 		return m[1], nil
 	}
 	return "", nil

@@ -17,10 +17,13 @@ package ui
 import (
 	"fmt"
 	"html"
+	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/lucasssvaz/traygolin/internal/olm"
+	"github.com/lucasssvaz/traygolin/internal/pangolin"
 )
 
 // ModeText explains how this device reaches a site.
@@ -89,9 +92,34 @@ func updateHint(cliPath string) string {
 	if cliPath == "" {
 		return hint
 	}
-	return hint + "\n<tt>sudo chown root:root " + html.EscapeString(cliPath) + "</tt>\n\n" +
+	return hint + "\n<tt>sudo chown root:root " + html.EscapeString(shellQuote(cliPath)) + "</tt>\n\n" +
 		"The second command is needed because the updater leaves the new CLI owned by you, " +
 		"and Traygolin only connects with a root-owned CLI."
+}
+
+// shellQuote makes s safe to paste into a shell command.
+func shellQuote(s string) string {
+	safe := s != ""
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("_@%+=:,./-", r)) {
+			safe = false
+			break
+		}
+	}
+	if safe {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// folderURI is the file URI of the folder holding path. A relative path is
+// taken from the working directory, which is where TailLog reads it from.
+func folderURI(path string) string {
+	dir := filepath.Dir(path)
+	if abs, err := filepath.Abs(dir); err == nil {
+		dir = abs
+	}
+	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(dir)}).String()
 }
 
 // ClientText names the CLI and tunnel versions.
@@ -107,25 +135,21 @@ func ClientText(cliVersion string, st *olm.Status) string {
 }
 
 // SplitUpstream splits the CLI's upstream list into the two fields the
-// official clients show.
+// official clients show. Servers past the second, which the CLI accepts
+// but the fields have no room for, stay in the secondary field so that
+// saving Preferences does not drop them.
 func SplitUpstream(vals []string) (primary, secondary string) {
 	if len(vals) > 0 {
 		primary = vals[0]
 	}
 	if len(vals) > 1 {
-		secondary = vals[1]
+		secondary = strings.Join(vals[1:], ", ")
 	}
 	return primary, secondary
 }
 
 // JoinUpstream is the inverse of SplitUpstream for `pangolin config set`.
+// Either field may hold a comma-separated list.
 func JoinUpstream(primary, secondary string) string {
-	var parts []string
-	if p := strings.TrimSpace(primary); p != "" {
-		parts = append(parts, p)
-	}
-	if s := strings.TrimSpace(secondary); s != "" {
-		parts = append(parts, s)
-	}
-	return strings.Join(parts, ",")
+	return strings.Join(append(pangolin.SplitCSV(primary), pangolin.SplitCSV(secondary)...), ",")
 }

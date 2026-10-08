@@ -17,14 +17,15 @@
 package pangolin
 
 import (
-	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -65,9 +66,34 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 	return strings.TrimSpace(v), nil
 }
 
+// olmEnv are the variables `pangolin up` reads in place of its own flags,
+// under the generic names the standalone olm client uses. A desktop session
+// can carry any of them for unrelated reasons (LOG_LEVEL=warn, INTERFACE=
+// wlan0), and the CLI forwards them to the root tunnel as flags. Some of
+// those the helper refuses, which fails the connection, and the rest would
+// silently change the tunnel. Settings belong in Preferences or config.json.
+var olmEnv = []string{
+	"MTU", "DNS", "UPSTREAM_DNS", "MATCH_DOMAINS_DNS", "LOG_LEVEL", "INTERFACE",
+	"HTTP_ADDR", "PING_INTERVAL", "PING_TIMEOUT", "OVERRIDE_DNS", "TUNNEL_DNS",
+	"DISABLE_RELAY", "PREFER_LOCAL_ROUTES", "DISABLE_ROUTES_AND_ALIASES",
+	"SUBNET_ROUTER", "DISABLE_HOLEPUNCH",
+}
+
+// baseEnv is the inherited environment for a CLI invocation.
+func baseEnv(args []string) []string {
+	env := os.Environ()
+	if len(args) == 0 || args[0] != "up" {
+		return env
+	}
+	return slices.DeleteFunc(env, func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		return slices.Contains(olmEnv, name)
+	})
+}
+
 func (c *Client) command(ctx context.Context, extraEnv []string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, c.bin(), args...)
-	cmd.Env = append(append(os.Environ(), c.Env...), extraEnv...)
+	cmd.Env = append(append(baseEnv(args), c.Env...), extraEnv...)
 	cmd.Stdin = nil
 	cmd.WaitDelay = time.Second
 	return cmd
@@ -83,7 +109,7 @@ func (c *Client) output(ctx context.Context, timeout time.Duration, extraEnv []s
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err := cmd.Run()
+	err := ignoreWaitDelay(cmd, cmd.Run())
 	out := strings.TrimSpace(stdout.String())
 	errText := strings.TrimSpace(stderr.String())
 	if err != nil {
@@ -107,47 +133,119 @@ func (c *Client) stream(ctx context.Context, timeout time.Duration, onLine func(
 		defer cancel()
 	}
 	cmd := c.command(ctx, nil, args...)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return "", err
-	}
+	// Plain writers rather than pipes: exec then stops waiting for the output
+	// WaitDelay after the CLI exits, even if a child it started (such as the
+	// browser) still holds the pipe. Reading a pipe by hand would block until
+	// that child quit.
+	sink := &lineSink{onLine: onLine}
+	stdout, stderr := &lineWriter{sink: sink}, &lineWriter{sink: sink}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
 	if err := cmd.Start(); err != nil {
 		return "", wrapRunError(c.bin(), args, "", "", err)
 	}
-	var (
-		mu  sync.Mutex
-		all strings.Builder
-		wg  sync.WaitGroup
-	)
-	scan := func(r io.Reader) {
-		defer wg.Done()
-		sc := bufio.NewScanner(r)
-		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		for sc.Scan() {
-			line := sc.Text()
-			mu.Lock()
-			all.WriteString(line)
-			all.WriteByte('\n')
-			mu.Unlock()
-			if onLine != nil {
-				onLine(line)
-			}
-		}
-	}
-	wg.Add(2)
-	go scan(stdout)
-	go scan(stderr)
-	wg.Wait()
-	waitErr := cmd.Wait()
-	out := strings.TrimSpace(all.String())
+	waitErr := ignoreWaitDelay(cmd, cmd.Wait())
+	stdout.flush()
+	stderr.flush()
+	out := strings.TrimSpace(sink.text())
 	if waitErr != nil {
 		return out, wrapRunError(c.bin(), args, out, "", waitErr)
 	}
 	return out, nil
+}
+
+// ignoreWaitDelay forgives the error exec reports when the CLI itself
+// succeeded but a child it left behind kept the output open past WaitDelay.
+func ignoreWaitDelay(cmd *exec.Cmd, err error) error {
+	if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState != nil && cmd.ProcessState.Success() {
+		return nil
+	}
+	return err
+}
+
+// maxLine bounds how much of one output line is kept. The rest of an
+// overlong line is dropped instead of failing the whole command.
+const maxLine = 1024 * 1024
+
+// maxKept bounds how much output a streamed command keeps for its result
+// and error message. Older lines are dropped first.
+const maxKept = 256 * 1024
+
+// lineSink collects the lines of stdout and stderr in the order they arrive.
+type lineSink struct {
+	mu     sync.Mutex
+	all    []byte
+	onLine func(string)
+}
+
+func (s *lineSink) add(line string) {
+	s.mu.Lock()
+	s.all = append(append(s.all, line...), '\n')
+	if len(s.all) > 2*maxKept {
+		keep := s.all[len(s.all)-maxKept:]
+		if i := bytes.IndexByte(keep, '\n'); i >= 0 && i+1 < len(keep) {
+			keep = keep[i+1:]
+		}
+		s.all = append(s.all[:0], keep...)
+	}
+	s.mu.Unlock()
+	if s.onLine != nil {
+		s.onLine(line)
+	}
+}
+
+func (s *lineSink) text() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return string(s.all)
+}
+
+// lineWriter splits what it is given into lines. Each stream gets its own
+// writer because lines from the two must not be glued together.
+type lineWriter struct {
+	sink    *lineSink
+	mu      sync.Mutex
+	pending []byte
+	skip    bool // inside an overlong line
+}
+
+func (w *lineWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	rest := p
+	for len(rest) > 0 {
+		i := bytes.IndexByte(rest, '\n')
+		chunk := rest
+		if i >= 0 {
+			chunk = rest[:i]
+		}
+		if !w.skip {
+			room := maxLine - len(w.pending)
+			if len(chunk) > room {
+				chunk, w.skip = chunk[:room], true
+			}
+			w.pending = append(w.pending, chunk...)
+		}
+		if i < 0 {
+			break
+		}
+		w.emit()
+		rest = rest[i+1:]
+	}
+	return len(p), nil
+}
+
+func (w *lineWriter) emit() {
+	line := strings.TrimSuffix(string(w.pending), "\r")
+	w.pending, w.skip = w.pending[:0], false
+	w.sink.add(line)
+}
+
+func (w *lineWriter) flush() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.pending) > 0 {
+		w.emit()
+	}
 }
 
 func wrapRunError(bin string, args []string, stdout, stderr string, err error) error {
@@ -169,8 +267,11 @@ func wrapRunError(bin string, args []string, stdout, stderr string, err error) e
 func redact(args []string) []string {
 	out := append([]string(nil), args...)
 	for i := range out {
-		if out[i] == "--secret" && i+1 < len(out) {
+		switch {
+		case out[i] == "--secret" && i+1 < len(out):
 			out[i+1] = "<redacted>"
+		case strings.HasPrefix(out[i], "--secret="):
+			out[i] = "--secret=<redacted>"
 		}
 	}
 	return out
@@ -201,14 +302,17 @@ func lastLines(s string, n int) string {
 	return strings.Join(lines, " ")
 }
 
-// ConfigDir is the CLI's per-user config directory.
+// ConfigDir is the CLI's per-user config directory. The CLI always uses
+// ~/.config/pangolin and does not follow XDG_CONFIG_HOME, so neither does
+// this: anywhere else would not be where the CLI keeps its files.
 func ConfigDir() string {
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "pangolin")
-	}
 	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Join(".", ".config", "pangolin")
+	if err != nil || home == "" {
+		u, uerr := user.Current()
+		if uerr != nil || u.HomeDir == "" {
+			return filepath.Join(".", ".config", "pangolin")
+		}
+		home = u.HomeDir
 	}
 	return filepath.Join(home, ".config", "pangolin")
 }

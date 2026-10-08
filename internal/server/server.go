@@ -137,8 +137,12 @@ func SupportsExitNodes(version string) bool {
 
 func parseVersion(v string) ([3]int, bool) {
 	var out [3]int
-	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
-	v, _, _ = strings.Cut(v, "-")
+	v = strings.TrimSpace(v)
+	v = strings.TrimPrefix(strings.TrimPrefix(v, "v"), "V")
+	// Drop a pre-release tag ("-rc.1") and build metadata ("+abc").
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		v = v[:i]
+	}
 	parts := strings.Split(v, ".")
 	if v == "" || len(parts) > 3 {
 		return out, false
@@ -146,7 +150,7 @@ func parseVersion(v string) ([3]int, bool) {
 	for i, p := range parts {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 0 {
-			return out, false
+			return [3]int{}, false
 		}
 		out[i] = n
 	}
@@ -162,11 +166,26 @@ type Client struct {
 }
 
 func (c *Client) baseURL() string {
-	host := strings.TrimSuffix(strings.TrimSpace(c.Host), "/")
-	if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
+	host := strings.TrimRight(strings.TrimSpace(c.Host), "/")
+	// URL schemes are not case sensitive.
+	if lower := strings.ToLower(host); !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
 		host = "https://" + host
 	}
 	return host + "/api/v1"
+}
+
+// checkRedirect stops redirect loops and refuses to follow a redirect from
+// https to plain http, which would send the session cookie in the clear.
+func checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	for _, prev := range via {
+		if prev.URL.Scheme == "https" && req.URL.Scheme != "https" {
+			return errors.New("refusing to follow a redirect from https to http")
+		}
+	}
+	return nil
 }
 
 type envelope struct {
@@ -195,7 +214,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 
 	hc := c.HTTP
 	if hc == nil {
-		hc = &http.Client{Timeout: 15 * time.Second}
+		hc = &http.Client{Timeout: 15 * time.Second, CheckRedirect: checkRedirect}
 	}
 	resp, err := hc.Do(req)
 	if err != nil {
@@ -207,11 +226,20 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	var env envelope
+	parseErr := json.Unmarshal(body, &env)
+	switch {
+	case resp.StatusCode == http.StatusUnauthorized:
+		return ErrUnauthorized
+	case resp.StatusCode == http.StatusForbidden:
+		// Pangolin also answers 403 when the user may not see something.
+		// That is not an expired session, so say what the server said.
+		if parseErr == nil && env.Message != "" {
+			return fmt.Errorf("GET %s: %s", path, env.Message)
+		}
 		return ErrUnauthorized
 	}
-	var env envelope
-	if err := json.Unmarshal(body, &env); err != nil {
+	if parseErr != nil {
 		return fmt.Errorf("GET %s: HTTP %d: unexpected response", path, resp.StatusCode)
 	}
 	if !env.Success || resp.StatusCode >= 400 {
@@ -273,7 +301,11 @@ func (c *Client) ExitNodes(ctx context.Context, orgID string) ([]ExitNode, error
 		SiteOnlines    []bool   `json:"siteOnlines"`
 	}
 	var nodes []ExitNode
-	for page := 1; ; page++ {
+	seen := map[int]bool{}
+	// maxPages bounds the loop if a server ignores the page parameter or
+	// keeps returning full pages.
+	const maxPages = 100
+	for page := 1; page <= maxPages; page++ {
 		var data struct {
 			SiteResources []resource `json:"siteResources"`
 		}
@@ -286,7 +318,15 @@ func (c *Client) ExitNodes(ctx context.Context, orgID string) ([]ExitNode, error
 			return nil, err
 		}
 		// Older servers ignore the mode filter and return every resource.
+		fresh := 0
 		for _, r := range data.SiteResources {
+			// The list can shift between requests, and a server that ignores
+			// the page number sends the same items again.
+			if seen[r.SiteResourceID] {
+				continue
+			}
+			seen[r.SiteResourceID] = true
+			fresh++
 			if r.Mode != "gateway" || !r.Enabled || len(r.SiteIDs) == 0 || r.NiceID == "" {
 				continue
 			}
@@ -299,8 +339,9 @@ func (c *Client) ExitNodes(ctx context.Context, orgID string) ([]ExitNode, error
 				SiteOnline: r.SiteOnlines,
 			})
 		}
-		if len(data.SiteResources) < pageSize {
+		if len(data.SiteResources) < pageSize || fresh == 0 {
 			return nodes, nil
 		}
 	}
+	return nodes, nil
 }

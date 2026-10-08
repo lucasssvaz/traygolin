@@ -86,7 +86,7 @@ func TestSitesAndClientText(t *testing.T) {
 
 func TestUpstreamRoundTrip(t *testing.T) {
 	p, s := SplitUpstream([]string{"1.1.1.1", "8.8.8.8", "9.9.9.9"})
-	if p != "1.1.1.1" || s != "8.8.8.8" || JoinUpstream(p, s) != "1.1.1.1,8.8.8.8" || JoinUpstream(" ", "") != "" {
+	if p != "1.1.1.1" || s != "8.8.8.8, 9.9.9.9" || JoinUpstream(p, s) != "1.1.1.1,8.8.8.8,9.9.9.9" || JoinUpstream(" ", "") != "" {
 		t.Fatal("upstream")
 	}
 }

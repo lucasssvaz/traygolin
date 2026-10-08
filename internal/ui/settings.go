@@ -19,7 +19,6 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/diamondburned/gotk4-adwaita/pkg/adw"
 	coreglib "github.com/diamondburned/gotk4/pkg/core/glib"
@@ -168,7 +167,7 @@ func (a *App) showLogs() {
 	open := gtk.NewButtonFromIconName("folder-open-symbolic")
 	open.SetTooltipText("Open Log Folder")
 	open.ConnectClicked(func() {
-		gtk.NewURILauncher("file://"+filepath.Dir(path)).Launch(a.ctx, a.window(), nil)
+		gtk.NewURILauncher(folderURI(path)).Launch(a.ctx, a.window(), nil)
 	})
 
 	header := adw.NewHeaderBar()

@@ -265,7 +265,7 @@ func (a *App) syncActions() {
 	set("select-org", idle && cliOK && loggedIn)
 	set("select-exit-node", idle && cliOK && loggedIn && tray.ExitNodesUnavailable(*st) == "")
 	setChoiceState(a.actions["select-org"], tray.CurrentOrg(*st))
-	setChoiceState(a.actions["select-exit-node"], CurrentExitNiceID(st))
+	setChoiceState(a.actions["select-exit-node"], ExitActionState(st))
 	set("setup", st.CLI == nil || !st.CLI.HelperInstalled)
 	set("check-updates", cliOK)
 	set("reset-dns", idle && cliOK && !running)
@@ -318,7 +318,9 @@ func (a *App) initTray(ctx context.Context) {
 
 	go func() {
 		if err := t.Start(); err != nil {
-			slog.Error("failed to start tray icon", "err", err)
+			if !errors.Is(err, tray.ErrClosed) {
+				slog.Error("failed to start tray icon", "err", err)
+			}
 			return
 		}
 		glib.IdleAdd(func() {
@@ -478,7 +480,7 @@ func (a *App) connectFailed(err error) {
 func firstLine(s string) string {
 	s = strings.TrimSpace(s)
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		s = s[:i]
+		s = strings.TrimSpace(s[:i])
 	}
 	return s
 }
@@ -525,15 +527,7 @@ func (a *App) stopTunnel() {
 		ctx, cancel := context.WithTimeout(a.ctx, disconnectTimeout)
 		defer cancel()
 
-		err := a.olm.Exit(ctx)
-		switch {
-		case errors.Is(err, olm.ErrNotRunning):
-			err = nil
-		case errors.Is(err, olm.ErrPermission):
-			err = privhelper.PrivilegedDown(ctx)
-		case err == nil:
-			err = a.olm.WaitStopped(ctx)
-		}
+		err := a.disconnect(ctx)
 		a.pollNow(ctx)
 
 		glib.IdleAdd(func() {
@@ -544,6 +538,21 @@ func (a *App) stopTunnel() {
 			}
 		})
 	}()
+}
+
+// disconnect stops the tunnel, through the helper when this user cannot
+// reach its socket. A tunnel that is not running is not an error.
+func (a *App) disconnect(ctx context.Context) error {
+	err := a.olm.Exit(ctx)
+	switch {
+	case errors.Is(err, olm.ErrNotRunning):
+		return nil
+	case errors.Is(err, olm.ErrPermission):
+		return privhelper.PrivilegedDown(ctx)
+	case err == nil:
+		return a.olm.WaitStopped(ctx)
+	}
+	return err
 }
 
 // run runs f off the main thread and then refreshes state.
@@ -579,12 +588,16 @@ func (a *App) logout() {
 			return
 		}
 		a.run(func(ctx context.Context) error {
-			if a.olm.Running(ctx) {
-				if err := a.olm.Exit(ctx); err == nil {
-					_ = a.olm.WaitStopped(ctx)
-				}
+			// The dialog promises that the tunnel disconnects, so a tunnel
+			// that could not be stopped is reported, but the session still
+			// ends.
+			dctx, cancel := context.WithTimeout(ctx, disconnectTimeout)
+			derr := a.disconnect(dctx)
+			cancel()
+			if derr != nil {
+				derr = fmt.Errorf("disconnect: %w", derr)
 			}
-			return a.cli.Logout(ctx)
+			return errors.Join(a.cli.Logout(ctx), derr)
 		}, "Logged out")
 	})
 }
@@ -654,7 +667,7 @@ func (a *App) selectOrg(id string) {
 // stops using one when niceID is "". Without a running tunnel the choice
 // is saved for the next connection.
 func (a *App) selectExitNode(niceID string) {
-	unchanged := niceID == "" && tray.CurrentExitNode(a.state) == 0 ||
+	unchanged := niceID == "" && !tray.ExitNodeInUse(a.state) ||
 		niceID != "" && niceID == CurrentExitNiceID(&a.state)
 	if unchanged || a.state.Busy != "" {
 		return
@@ -684,9 +697,12 @@ func (a *App) selectExitNode(niceID string) {
 
 	label := niceID
 	resourceID := 0
-	for _, e := range a.state.Server.ExitNodes {
-		if e.NiceID == niceID {
-			label, resourceID = e.Label(), e.ResourceID
+	if a.state.Server != nil {
+		for _, e := range a.state.Server.ExitNodes {
+			if e.NiceID == niceID {
+				label, resourceID = e.Label(), e.ResourceID
+				break
+			}
 		}
 	}
 	ok := label + " will be used when you connect"

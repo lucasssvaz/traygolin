@@ -39,7 +39,7 @@ var (
 	reIdent     = regexp.MustCompile(`^[A-Za-z0-9._:@-]{1,256}$`)
 	reIface     = regexp.MustCompile(`^[A-Za-z0-9_-]{1,15}$`)
 	reHostPort  = regexp.MustCompile(`^[A-Za-z0-9.:\[\]-]{1,256}$`)
-	reDomainPat = regexp.MustCompile(`^[A-Za-z0-9.*?_-]{1,253}$`)
+	reDomainPat = regexp.MustCompile(`^[\p{L}\p{N}.*?_-]{1,253}$`)
 	reInt       = regexp.MustCompile(`^[0-9]{1,10}$`)
 )
 
@@ -85,10 +85,14 @@ func checkDuration(v string) error {
 	return nil
 }
 
+// maxListItems bounds the comma-separated flags. The CLI sets no limit and
+// forwards the lists from config.json whole, so this is only a backstop.
+const maxListItems = 256
+
 func checkList(item *regexp.Regexp, what string) func(string) error {
 	return func(v string) error {
 		parts := strings.Split(v, ",")
-		if len(parts) > 32 {
+		if len(parts) > maxListItems {
 			return fmt.Errorf("too many %s entries", what)
 		}
 		for _, p := range parts {

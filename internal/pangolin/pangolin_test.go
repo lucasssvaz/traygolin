@@ -38,8 +38,10 @@ func writeFakeCLI(t *testing.T, body string) string {
 func withConfigHome(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	p := filepath.Join(dir, "pangolin")
+	t.Setenv("HOME", dir)
+	// Set elsewhere on purpose: the CLI ignores it, so Traygolin must too.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "xdg-decoy"))
+	p := filepath.Join(dir, ".config", "pangolin")
 	if err := os.MkdirAll(p, 0o755); err != nil {
 		t.Fatal(err)
 	}

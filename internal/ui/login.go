@@ -16,6 +16,7 @@ package ui
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"time"
 
@@ -33,8 +34,17 @@ func LoginHost(cloud bool, custom string) string {
 		return metadata.CloudHost
 	}
 	custom = strings.TrimSpace(custom)
-	if custom != "" && !strings.Contains(custom, "://") {
+	if custom == "" {
+		return ""
+	}
+	if !strings.Contains(custom, "://") {
 		custom = "https://" + custom
+	}
+	// The address ends up on the command line of `pangolin login`, so only
+	// a plain web address is passed on.
+	u, err := url.Parse(custom)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || strings.ContainsAny(custom, " \t\r\n") {
+		return ""
 	}
 	return custom
 }

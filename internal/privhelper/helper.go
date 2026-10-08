@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -256,15 +257,28 @@ func readsCredentialEnv(bin string) bool {
 func moveCredentials(args []string) (rest, env []string) {
 	rest = make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
-		name, value, hasValue := strings.Cut(strings.TrimPrefix(args[i], "--"), "=")
-		key, ok := credentialEnv[name]
-		if !ok || !strings.HasPrefix(args[i], "--") {
-			rest = append(rest, args[i])
+		arg := args[i]
+		if !strings.HasPrefix(arg, "--") {
+			rest = append(rest, arg)
 			continue
 		}
-		if !hasValue && i+1 < len(args) {
+		name, value, hasValue := strings.Cut(arg[2:], "=")
+		key, isCredential := credentialEnv[name]
+		takesNext := !hasValue && i+1 < len(args) && allowed[name].kind == valueFlag
+		if takesNext {
 			i++
+			if !isCredential {
+				// The word after a value flag is its value, even when it
+				// looks like another flag ("--org --id" sets the
+				// organization to "--id").
+				rest = append(rest, arg, args[i])
+				continue
+			}
 			value = args[i]
+		}
+		if !isCredential {
+			rest = append(rest, arg)
+			continue
 		}
 		env = append(env, key+"="+value)
 	}
@@ -421,16 +435,26 @@ func runHelper(ctx context.Context, command string) error {
 	return nil
 }
 
+var shimSeq atomic.Uint64
+
 // ShimDir creates a private directory containing a "sudo" symlink to
 // self and returns it, for prepending to the CLI's PATH.
 func ShimDir(self string) (string, error) {
 	base := os.Getenv("XDG_RUNTIME_DIR")
-	if base == "" {
+	fallback := base == ""
+	if fallback {
 		base = filepath.Join(os.TempDir(), "traygolin-"+strconv.Itoa(os.Getuid()))
 	}
 	dir := filepath.Join(base, "traygolin", "bin")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
+	}
+	if fallback {
+		// The per-user directory sits in a shared place such as /tmp. Whoever
+		// owns it, or can write to it, could swap out what is below.
+		if err := checkOwned(base, os.Getuid(), false); err != nil {
+			return "", err
+		}
 	}
 	if err := checkOwned(dir, os.Getuid(), false); err != nil {
 		return "", err
@@ -439,8 +463,14 @@ func ShimDir(self string) (string, error) {
 	if cur, err := os.Readlink(link); err == nil && cur == self {
 		return dir, nil
 	}
-	_ = os.Remove(link)
-	if err := os.Symlink(self, link); err != nil {
+	// Replace the link in one step so two launches at once cannot trip over
+	// each other.
+	tmp := fmt.Sprintf("%s.%d.%d", link, os.Getpid(), shimSeq.Add(1))
+	if err := os.Symlink(self, tmp); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp, link); err != nil {
+		_ = os.Remove(tmp)
 		return "", err
 	}
 	return dir, nil

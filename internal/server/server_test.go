@@ -80,8 +80,8 @@ func TestExitNodesFiltersAndPaginates(t *testing.T) {
 			res[1] = map[string]any{"siteResourceId": 8, "niceId": "off", "mode": "gateway", "enabled": false, "siteIds": []int{5}}
 		} else {
 			res = append(res,
-				map[string]any{"siteResourceId": 9, "niceId": "empty", "mode": "gateway", "enabled": true},
-				map[string]any{"siteResourceId": 10, "niceId": "eu", "mode": "gateway", "enabled": true, "siteIds": []int{6}, "siteOnlines": []bool{false}},
+				map[string]any{"siteResourceId": 1009, "niceId": "empty", "mode": "gateway", "enabled": true},
+				map[string]any{"siteResourceId": 1010, "niceId": "eu", "mode": "gateway", "enabled": true, "siteIds": []int{6}, "siteOnlines": []bool{false}},
 			)
 		}
 		return map[string]any{"siteResources": res}

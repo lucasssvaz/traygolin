@@ -179,7 +179,14 @@ func (s *Status) TunnelIP() string {
 			}
 		}
 	}
-	for k, v := range s.NetworkSettings {
+	// Sorted, so that several matching keys give the same answer every time.
+	keys := make([]string, 0, len(s.NetworkSettings))
+	for k := range s.NetworkSettings {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := s.NetworkSettings[k]
 		lk := strings.ToLower(k)
 		if strings.Contains(lk, "ipv4") && strings.Contains(lk, "address") {
 			if str := firstString(v); str != "" {
@@ -254,9 +261,12 @@ func (c *Client) do(ctx context.Context, method, path string, body any, want int
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// Running reports whether the tunnel answers its health check.
+// Running reports whether the tunnel answers its health check. A socket
+// this user may not open counts as running: the tunnel behind it cannot be
+// ruled out, and callers that need to know more should use Status.
 func (c *Client) Running(ctx context.Context) bool {
-	return c.do(ctx, http.MethodGet, "/health", nil, 0, nil) == nil
+	err := c.do(ctx, http.MethodGet, "/health", nil, 0, nil)
+	return err == nil || errors.Is(err, ErrPermission)
 }
 
 // Status fetches the tunnel's status. It returns ErrNotRunning when no
@@ -275,14 +285,27 @@ func (c *Client) Exit(ctx context.Context) error {
 	return c.do(ctx, http.MethodPost, "/exit", nil, 0, nil)
 }
 
-// WaitStopped polls until the tunnel no longer answers or ctx ends.
+// WaitStopped polls until the tunnel no longer answers or ctx ends. It
+// returns ErrPermission if the socket cannot be opened, since that says
+// nothing about whether the tunnel stopped.
 func (c *Client) WaitStopped(ctx context.Context) error {
 	t := time.NewTicker(100 * time.Millisecond)
 	defer t.Stop()
 	for {
-		if !c.Running(ctx) {
-			return nil
+		err := c.do(ctx, http.MethodGet, "/health", nil, 0, nil)
+		// A check that failed because the caller gave up says nothing
+		// about the tunnel either.
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
+		switch {
+		case errors.Is(err, ErrNotRunning):
+			return nil
+		case errors.Is(err, ErrPermission):
+			return err
+		}
+		// Anything else, such as a connection cut while the tunnel shuts
+		// down, is checked again.
 		select {
 		case <-ctx.Done():
 			return ctx.Err()

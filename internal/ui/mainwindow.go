@@ -24,6 +24,7 @@ import (
 	"github.com/diamondburned/gotk4/pkg/glib/v2"
 	"github.com/diamondburned/gotk4/pkg/gtk/v4"
 	"github.com/lucasssvaz/traygolin/internal/gutil"
+	"github.com/lucasssvaz/traygolin/internal/olm"
 	"github.com/lucasssvaz/traygolin/internal/pangolin"
 	"github.com/lucasssvaz/traygolin/internal/tray"
 )
@@ -236,7 +237,13 @@ func (win *MainWindow) updatePages(st *State) {
 		if _, ok := win.pages["device"]; !ok {
 			win.addPage("device", NewDevicePage(win.app))
 		}
-		for _, peer := range st.Tunnel.Peers() {
+		// Site pages only show while online, so making them earlier would
+		// build and drop them again on every refresh while connecting.
+		var peers []olm.Peer
+		if st.Tunnel.Online() {
+			peers = st.Tunnel.Peers()
+		}
+		for _, peer := range peers {
 			name := sitePageName(peer.SiteID)
 			if _, ok := win.pages[name]; !ok {
 				win.addPage(name, NewSitePage(win.app, peer))

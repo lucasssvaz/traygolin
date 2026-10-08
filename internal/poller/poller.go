@@ -21,7 +21,9 @@ package poller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -122,9 +124,11 @@ func (p *Poller) Run(ctx context.Context) {
 	go p.watchServer(ctx, n)
 	go p.watchCLI(ctx, n)
 
-	interval := p.Interval
-	if interval <= 0 {
-		interval = DefaultInterval
+	// A zero or tiny interval would make the poller refresh in a tight loop,
+	// so every interval is held to the allowed range.
+	interval := DefaultInterval
+	if p.Interval > 0 {
+		interval = ClampInterval(p.Interval)
 	}
 	var fastUntil time.Time
 	current := func() time.Duration {
@@ -143,7 +147,8 @@ func (p *Poller) Run(ctx context.Context) {
 			return
 		case p.poll <- struct{}{}:
 			n = n.Notify()
-		case interval = <-p.interval:
+		case d := <-p.interval:
+			interval = ClampInterval(d)
 			n = n.Notify()
 		case d := <-p.fast:
 			fastUntil = time.Now().Add(d)
@@ -311,12 +316,27 @@ func (p *Poller) fetchServer(ctx context.Context, acc pangolin.Account) *ServerS
 	return s
 }
 
+// binaryStamp identifies the contents of the file at path well enough to
+// notice that it was replaced.
+func binaryStamp(path string) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d/%d", fi.ModTime().UnixNano(), fi.Size())
+}
+
 func (p *Poller) watchCLI(ctx context.Context, n *notifier) {
 	var prev *CLIStatus
+	var prevStamp string
 	for {
 		s := &CLIStatus{HelperInstalled: privhelper.Ready()}
 		s.Path, s.Err = p.CLI.LookPath()
-		if prev != nil && prev.Path == s.Path {
+		// "pangolin update" replaces the binary in place, so the file itself
+		// is checked as well as its path. A version that could not be read
+		// is asked for again on the next refresh.
+		stamp := binaryStamp(s.Path)
+		if prev != nil && prev.Path == s.Path && stamp == prevStamp && prev.Version != "" {
 			s.Version = prev.Version
 		} else if s.Err == nil {
 			v, err := p.CLI.Version(ctx)
@@ -325,6 +345,7 @@ func (p *Poller) watchCLI(ctx context.Context, n *notifier) {
 			}
 			s.Version = v
 		}
+		prevStamp = stamp
 		if prev == nil || !prev.equal(s) {
 			prev = s
 			if p.New != nil {

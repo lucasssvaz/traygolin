@@ -4,11 +4,14 @@ Traygolin is an unofficial Linux tray application for the [Pangolin](https://pan
 
 Because Pangolin does not provide an official desktop app for Linux, Traygolin wraps the official `pangolin` CLI to give you a desktop interface, system tray icon, and background status polling. It lets you connect, disconnect, switch accounts and organizations, pick exit nodes, and configure routing and DNS settings without needing a terminal or typing your password every time.
 
-> **Disclaimer:** Traygolin is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Fossorial, Pangolin, or Trayscale.
+## About this project
+
+Traygolin is a personal project. I built it because the lack of a proper Pangolin client on Linux was bothering me, and it works well for my own use case. It has not been tested against every setup, so there may be bugs. Bug reports are welcome. Please open an issue on [GitHub](https://github.com/lucasssvaz/traygolin/issues) with your distribution, the Traygolin and Pangolin CLI versions, and what you did before it went wrong.
 
 The interface and polling design are modeled on [Trayscale](https://github.com/DeedleFake/trayscale). Portions adapted from Trayscale are licensed under MIT and attributed in [NOTICE](NOTICE).
 
----
+
+> **Disclaimer:** Traygolin is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Fossorial, Pangolin, or Trayscale.
 
 ## Requirements
 
@@ -22,8 +25,6 @@ Before installing Traygolin, ensure you have:
    - Supported: Ubuntu 26.04 LTS (Resolute) or later, Arch Linux / CachyOS, Fedora 42+, or any modern distribution shipping Libadwaita >= 1.9.
    - **Ubuntu 24.04 LTS is not supported** because it only provides Libadwaita 1.5. See [docs/install.md](docs/install.md) for details.
 3. **polkit**: Used for passwordless connection elevation. Desktop environments include this by default.
-
----
 
 ## Installation
 
@@ -77,8 +78,6 @@ Pre-built packages are also attached to each [GitHub Release](https://github.com
   - **Arch:** `sudo pacman -S gtk4 libadwaita gobject-introspection polkit hicolor-icon-theme`
   - **Ubuntu 26.04+:** `sudo apt install libgtk-4-1 libadwaita-1-0 libglib2.0-bin libgirepository-1.0-1 pkexec polkitd hicolor-icon-theme`
 
----
-
 ### Option 2: Building from source
 
 Building from source requires Go 1.24+, a C compiler, and development packages for GTK 4, Libadwaita 1.9, and GObject Introspection.
@@ -108,8 +107,6 @@ sudo make install
 
 `make install` places the binary in `/usr/bin/traygolin`, installs desktop entries, icons, and man pages, and sets up the root helper and polkit policy under `/usr/lib/traygolin/` and `/usr/share/polkit-1/actions/`.
 
----
-
 ## Usage
 
 Launch **Traygolin** from your desktop application launcher or run `traygolin` in a terminal.
@@ -129,8 +126,6 @@ Launch **Traygolin** from your desktop application launcher or run `traygolin` i
 
 For detailed interface documentation and configuration options, see [docs/usage.md](docs/usage.md).
 
----
-
 ## How Passwordless Connect Works
 
 The Pangolin CLI normally invokes `sudo` when establishing a tunnel. Traygolin intercepts this call and routes the command through a dedicated privileged helper (`traygolin-helper`) using polkit.
@@ -138,8 +133,6 @@ The Pangolin CLI normally invokes `sudo` when establishing a tunnel. Traygolin i
 A bundled polkit policy allows the locally logged-in user to bring the tunnel up without entering a password, mirroring the behavior of NetworkManager VPN connections. The helper strictly validates command arguments and only executes the root-owned `pangolin` binary. Disconnecting, checking status, switching organizations, and querying exit nodes talk to the tunnel socket directly and require no elevated permissions.
 
 For the full security model and data flow, see [docs/architecture.md](docs/architecture.md).
-
----
 
 ## Documentation
 
@@ -149,8 +142,6 @@ For the full security model and data flow, see [docs/architecture.md](docs/archi
 - [docs/packaging.md](docs/packaging.md): Packaging scripts, Debian `.deb` builds, and AUR publishing.
 - [docs/development.md](docs/development.md): Development workflow, tests, and CI/CD pipelines.
 
----
-
 ## License
 
 This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms.
@@ -158,8 +149,6 @@ This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE) an
 Components adapted from Trayscale are licensed under the MIT License. See [LICENSES/MIT-Trayscale.txt](LICENSES/MIT-Trayscale.txt).
 
 The Pangolin name, trademarks, and associated brand assets belong to Fossorial and are not used in Traygolin's branding or app icons.
-
----
 
 ## AI Disclaimer
 

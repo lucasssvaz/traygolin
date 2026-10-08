@@ -73,7 +73,7 @@ func Set(enabled bool, execPath string) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(p, []byte(body), 0o644)
+	return writeAtomic(p, []byte(body), 0o644)
 }
 
 // command prefers the bare name when PATH resolves it to execPath, so a
@@ -112,6 +112,9 @@ func entry(cmd string) string {
 
 // quoteArg quotes an Exec argument per the Desktop Entry spec.
 func quoteArg(s string) string {
+	// A percent sign starts a field code (%f, %u, ...) in Exec, so a literal
+	// one has to be doubled.
+	s = strings.ReplaceAll(s, "%", "%%")
 	if !strings.ContainsAny(s, " \t\n\"'\\><~|&;$*?#()`") {
 		return s
 	}
@@ -122,4 +125,26 @@ func quoteArg(s string) string {
 // escapeString applies the escapes of the spec's string value type.
 func escapeString(s string) string {
 	return strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\t", `\t`, "\r", `\r`).Replace(s)
+}
+
+// writeAtomic replaces path in one step, so that a desktop session starting
+// at the same moment never reads half an entry.
+func writeAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".autostart-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }

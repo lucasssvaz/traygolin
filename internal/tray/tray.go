@@ -19,6 +19,7 @@ package tray
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -90,6 +91,7 @@ type Tray struct {
 	OnQuit        func()
 
 	m      sync.Mutex
+	closed bool
 	item   *tray.Item
 	prev   map[unique.Handle[string]][]any
 	icons  pixmaps
@@ -114,10 +116,18 @@ type State struct {
 	Busy     string
 }
 
+// ErrClosed is returned by Start after Close.
+var ErrClosed = errors.New("tray icon closed")
+
 func (t *Tray) Start() error {
 	t.m.Lock()
 	defer t.m.Unlock()
 
+	if t.closed {
+		// Start runs in the background, so Close can come first. Starting
+		// anyway would leave an icon nobody can remove.
+		return ErrClosed
+	}
 	if t.item != nil {
 		return nil
 	}
@@ -176,6 +186,7 @@ func (t *Tray) Close() error {
 	t.m.Lock()
 	defer t.m.Unlock()
 
+	t.closed = true
 	if t.item == nil {
 		return nil
 	}
@@ -315,6 +326,7 @@ func (t *Tray) updateOrgs(st State, enabled bool) {
 
 func (t *Tray) updateExit(st State, enabled bool) {
 	current := CurrentExitNode(st)
+	inUse := ExitNodeInUse(st)
 	label := ExitNodeLabel(st)
 	unavailable := ExitNodesUnavailable(st)
 	if unavailable != "" {
@@ -325,7 +337,7 @@ func (t *Tray) updateExit(st State, enabled bool) {
 	if st.Server != nil {
 		nodes = st.Server.ExitNodes
 	}
-	key := []any{current, label, enabled}
+	key := []any{current, inUse, label, enabled}
 	for _, e := range nodes {
 		key = append(key, e.ResourceID, e.NiceID, e.Label(), e.Online())
 	}
@@ -341,9 +353,9 @@ func (t *Tray) updateExit(st State, enabled bool) {
 	add(
 		tray.MenuItemLabel("None"),
 		tray.MenuItemToggleType(tray.Radio),
-		tray.MenuItemToggleState(toggleState(current == 0)),
+		tray.MenuItemToggleState(toggleState(!inUse)),
 		handler(func() {
-			if current != 0 && t.OnSelectExit != nil {
+			if inUse && t.OnSelectExit != nil {
 				t.OnSelectExit("")
 			}
 		}),
@@ -479,7 +491,14 @@ func CurrentExitNode(st State) int {
 // ExitNodesAvailable reports whether there is an exit node to choose or
 // one in use.
 func ExitNodesAvailable(st State) bool {
-	return (st.Server != nil && len(st.Server.ExitNodes) > 0) || CurrentExitNode(st) != 0
+	return (st.Server != nil && len(st.Server.ExitNodes) > 0) || ExitNodeInUse(st)
+}
+
+// ExitNodeInUse reports whether an exit node is in use or saved. Unlike
+// CurrentExitNode it is also true when the tunnel routes through an exit
+// node without saying which resource it is.
+func ExitNodeInUse(st State) bool {
+	return CurrentExitNode(st) != 0 || st.Tunnel.ExitNodeActive()
 }
 
 // ExitNodesUnavailable explains why exit nodes cannot be chosen, or
@@ -510,6 +529,11 @@ func ServerInfo(st State) server.Info {
 func ExitNodeLabel(st State) string {
 	id := CurrentExitNode(st)
 	if id == 0 {
+		// The tunnel can report an active exit node without saying which
+		// resource it is. Name its sites rather than claiming there is none.
+		if sites := ExitSites(st.Tunnel); sites != "" {
+			return sites
+		}
 		return "None"
 	}
 	if e, ok := st.Server.ExitNode(id); ok {
@@ -570,7 +594,11 @@ func ExitSites(s *poller.TunnelStatus) string {
 	var names []string
 	for _, p := range s.Peers() {
 		if s.Status.IsGateway(p.SiteID) {
-			names = append(names, p.Name)
+			name := p.Name
+			if name == "" {
+				name = "Site " + strconv.Itoa(p.SiteID)
+			}
+			names = append(names, name)
 		}
 	}
 	if len(names) == 0 {

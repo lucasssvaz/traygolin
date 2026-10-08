@@ -88,6 +88,10 @@ type accountsFile struct {
 // ServerClient returns an API client for the saved account userID. The
 // session token is read from accounts.json for this call only.
 func ServerClient(userID string) (*server.Client, error) {
+	if userID == "" {
+		// A record without a userId would otherwise match.
+		return nil, errors.New("no account given")
+	}
 	data, err := os.ReadFile(accountsPath())
 	if err != nil {
 		return nil, err
@@ -102,16 +106,29 @@ func ServerClient(userID string) (*server.Client, error) {
 	if err := json.Unmarshal(data, &file); err != nil {
 		return nil, err
 	}
-	for id, rec := range file.Accounts {
-		if id != userID && rec.UserID != userID {
-			continue
+	// The map key wins over a userId field, and keys are tried in order, so
+	// the same file always gives the same account.
+	rec, ok := file.Accounts[userID]
+	if !ok {
+		ids := make([]string, 0, len(file.Accounts))
+		for id := range file.Accounts {
+			ids = append(ids, id)
 		}
-		if rec.Host == "" || rec.SessionToken == "" {
-			return nil, server.ErrUnauthorized
+		sort.Strings(ids)
+		for _, id := range ids {
+			if file.Accounts[id].UserID == userID {
+				rec, ok = file.Accounts[id], true
+				break
+			}
 		}
-		return &server.Client{Host: rec.Host, Token: rec.SessionToken, CookieName: sessionCookieName()}, nil
 	}
-	return nil, fmt.Errorf("account %s is not saved", userID)
+	if !ok {
+		return nil, fmt.Errorf("account %s is not saved", userID)
+	}
+	if rec.Host == "" || rec.SessionToken == "" {
+		return nil, server.ErrUnauthorized
+	}
+	return &server.Client{Host: rec.Host, Token: rec.SessionToken, CookieName: sessionCookieName()}, nil
 }
 
 // LoadAuth reads accounts.json without spawning the CLI.
@@ -151,27 +168,63 @@ func parseAccounts(data []byte) Auth {
 		}
 		auth.Accounts = append(auth.Accounts, acc)
 	}
+	// Map iteration order is random, so ties (the same person on two
+	// servers) are broken by host and ID to keep the menu from reshuffling.
 	sort.Slice(auth.Accounts, func(i, j int) bool {
-		return strings.ToLower(auth.Accounts[i].Label()) < strings.ToLower(auth.Accounts[j].Label())
+		x, y := auth.Accounts[i], auth.Accounts[j]
+		if lx, ly := strings.ToLower(x.Label()), strings.ToLower(y.Label()); lx != ly {
+			return lx < ly
+		}
+		if x.Host != y.Host {
+			return x.Host < y.Host
+		}
+		return x.UserID < y.UserID
 	})
 	return auth
 }
 
 var (
-	reURL  = regexp.MustCompile(`https?://[^\s<>"'\x1b]+`)
-	reCode = regexp.MustCompile(`(?i)(?:enter the code|user code|device code|one-time code|verification code|code is|code:)\s*([A-Z0-9][A-Z0-9-]{3,})`)
+	reURL = regexp.MustCompile(`https?://[^\s<>"'\x1b]+`)
+	// The trigger phrase is matched without regard to case, the code itself is
+	// not: device codes are upper case, and prose such as "the code is valid
+	// for 10 minutes" must not be mistaken for one.
+	reCode = regexp.MustCompile(`(?i:enter the code|user code|device code|one-time code|verification code|code is|code:)\s*([A-Z0-9][A-Z0-9-]{3,})`)
 	reANSI = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
 )
 
 // LoginEvent is a streamed line from `pangolin login`.
 type LoginEvent struct {
 	Line string
+	// URL is the first URL in Line not seen on an earlier line, and URLs
+	// lists every such URL in order.
 	URL  string
+	URLs []string
 	Code string
 }
 
 // ExtractURLs returns every http(s) URL in text.
-func ExtractURLs(text string) []string { return reURL.FindAllString(text, -1) }
+func ExtractURLs(text string) []string {
+	urls := reURL.FindAllString(text, -1)
+	for i, u := range urls {
+		urls[i] = trimURL(u)
+	}
+	return urls
+}
+
+// trimURL drops punctuation that surrounds a link in prose, such as the full
+// stop at the end of a sentence or the bracket that closes a parenthesis.
+func trimURL(u string) string {
+	for {
+		trimmed := strings.TrimRight(u, ".,;:!?")
+		if strings.HasSuffix(trimmed, ")") && strings.Count(trimmed, "(") < strings.Count(trimmed, ")") {
+			trimmed = trimmed[:len(trimmed)-1]
+		}
+		if trimmed == u {
+			return u
+		}
+		u = trimmed
+	}
+}
 
 // ExtractDeviceCode returns a device login code in text, if any.
 func ExtractDeviceCode(text string) string {
@@ -197,9 +250,11 @@ func (c *Client) Login(ctx context.Context, host string, onEvent func(LoginEvent
 		for _, u := range ExtractURLs(line) {
 			if !seen[u] {
 				seen[u] = true
-				ev.URL = u
-				break
+				ev.URLs = append(ev.URLs, u)
 			}
+		}
+		if len(ev.URLs) > 0 {
+			ev.URL = ev.URLs[0]
 		}
 		onEvent(ev)
 	}, args...)
@@ -238,6 +293,11 @@ func (c *Client) SelectExitNode(ctx context.Context, niceID string) error {
 // in accounts.json. The CLI only offers this through an interactive menu.
 func ClearSavedExitNode() error {
 	path := accountsPath()
+	// The file may be a link into a dotfiles repository. Write through the
+	// link rather than replacing it with a regular file.
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -255,11 +315,28 @@ func ClearSavedExitNode() error {
 	}
 	var active string
 	_ = json.Unmarshal(doc["activeuserid"], &active)
+	if len(doc["accounts"]) == 0 {
+		return nil
+	}
 	var accounts map[string]map[string]json.RawMessage
 	if err := json.Unmarshal(doc["accounts"], &accounts); err != nil {
 		return err
 	}
+	if active == "" {
+		return nil
+	}
+	// The active user is named by its map key or by its userId, as in
+	// parseAccounts.
 	acc, ok := accounts[active]
+	if !ok {
+		for _, candidate := range accounts {
+			var id string
+			if json.Unmarshal(candidate["userId"], &id) == nil && id == active {
+				acc, ok = candidate, true
+				break
+			}
+		}
+	}
 	if !ok {
 		return nil
 	}

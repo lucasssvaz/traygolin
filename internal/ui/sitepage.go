@@ -54,6 +54,17 @@ type SitePage struct {
 
 func sitePageName(id int) string { return "site:" + strconv.Itoa(id) }
 
+// findPeer looks a site up by the ID its page was made with. That is the
+// ID SortedPeers reports, which is not always the key of the peers map.
+func findPeer(st *State, siteID int) (olm.Peer, bool) {
+	for _, p := range st.Tunnel.Peers() {
+		if p.SiteID == siteID {
+			return p, true
+		}
+	}
+	return olm.Peer{}, false
+}
+
 func NewSitePage(app *App, peer olm.Peer) *SitePage {
 	page := SitePage{app: app, siteID: peer.SiteID, peer: peer}
 	gutil.FillFromUI(&page, sitePageXML)
@@ -98,7 +109,7 @@ func (page *SitePage) Update(st *State) bool {
 	if !st.Tunnel.Online() {
 		return false
 	}
-	peer, ok := st.Tunnel.Status.Peers[page.siteID]
+	peer, ok := findPeer(st, page.siteID)
 	if !ok {
 		return false
 	}
