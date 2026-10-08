@@ -26,13 +26,34 @@ test -f "/usr/share/glib-2.0/schemas/${APPID}.gschema.xml" || die "missing gsche
 test -f "/usr/share/polkit-1/actions/${APPID}.policy" || die "missing polkit policy"
 test -f "/usr/share/icons/hicolor/256x256/apps/${APPID}.png" || die "missing png icon"
 test -f "/usr/share/icons/hicolor/scalable/apps/${APPID}.svg" || die "missing svg icon"
-if [ -f /usr/share/man/man1/traygolin.1 ] || [ -f /usr/share/man/man1/traygolin.1.gz ]; then
-	:
-elif grep -qrE 'path-exclude=.*/usr/share/man' /etc/dpkg 2>/dev/null ||
-	grep -qE '^[[:space:]]*NoExtract.*usr/share/man' /etc/pacman.conf 2>/dev/null; then
-	echo "smoke-installed: man page not extracted (image excludes /usr/share/man)"
-else
-	die "missing man page"
+found_man=
+for f in /usr/share/man/man1/traygolin.1 /usr/share/man/man1/traygolin.1.*; do
+	if [ -f "$f" ]; then
+		found_man=1
+		break
+	fi
+done
+owns_man=
+if command -v pacman >/dev/null; then
+	if { pacman -Qlq traygolin-bin 2>/dev/null || pacman -Qlq traygolin 2>/dev/null ||
+		pacman -Qlq traygolin-git 2>/dev/null || true; } |
+		grep -qE '/usr/share/man/man1/traygolin\.1'; then
+		owns_man=1
+	fi
+fi
+if command -v dpkg-query >/dev/null; then
+	if dpkg-query -L traygolin 2>/dev/null | grep -qE '/usr/share/man/man1/traygolin\.1'; then
+		owns_man=1
+	fi
+fi
+if [ -z "$found_man" ]; then
+	# Docker images often skip man pages (dpkg path-exclude, pacman
+	# NoExtract). The package still owns the file.
+	if [ -n "$owns_man" ] || [ ! -d /usr/share/man/man1 ]; then
+		echo "smoke-installed: man page not extracted (image excludes /usr/share/man)"
+	else
+		die "missing man page"
+	fi
 fi
 
 if grep -F "$HELPER" "/usr/share/polkit-1/actions/${APPID}.policy" >/dev/null; then
