@@ -156,7 +156,18 @@ jobs:
             dist/*
             SHA256SUMS
 
+  apt:
+    name: apt repository
+    needs: publish
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
+    secrets: inherit
+
   aur:
+    name: aur
     needs: publish
     if: ${{ needs.publish.outputs.sha256 != '' }}
     uses: ./.github/workflows/aur.yml

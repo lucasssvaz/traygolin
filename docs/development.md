@@ -50,8 +50,8 @@ metainfo validation. The Ubuntu job also builds a `.deb`. Release builds run the
 same smoke check on the staged or packaged binaries.
 
 Tagging `v*` runs the Release workflow: Arch and Ubuntu packages for amd64 and
-arm64, then AUR publish. A separate Pages workflow rebuilds the apt repo from
-those `.deb` assets.
+arm64, a GitHub release, then apt (Pages) and AUR in parallel. Apt and AUR can
+also be run by hand from their workflow files.
 
 A cold gotk4 compile takes most of a CI job, so the Go build and module caches
 are saved between runs, keyed on the distro, Go version, and `go.sum`. The first

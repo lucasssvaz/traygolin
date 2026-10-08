@@ -51,12 +51,22 @@ jobs:
           install -d -m 700 ~/.ssh
           printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
-          cat >> ~/.ssh/config <<EOF
-          Host aur.archlinux.org
-            IdentityFile ~/.ssh/aur
-            StrictHostKeyChecking accept-new
-            User aur
-          EOF
+          # Pin AUR host keys. `accept-new` is ignored in this container and
+          # fails clone with "Host key verification failed."
+          install -m644 packaging/aur/known_hosts ~/.ssh/known_hosts
+          # echo, not a indented heredoc: YAML would put spaces in front of Host
+          # and OpenSSH would ignore the stanza (that is what failed v0.1.0).
+          {
+            echo "Host aur.archlinux.org"
+            echo "  HostName aur.archlinux.org"
+            echo "  User aur"
+            echo "  IdentityFile $HOME/.ssh/aur"
+            echo "  IdentitiesOnly yes"
+            echo "  UserKnownHostsFile $HOME/.ssh/known_hosts"
+            echo "  StrictHostKeyChecking yes"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+          export GIT_SSH_COMMAND="ssh -F $HOME/.ssh/config -o IdentitiesOnly=yes"
           git config --global --add safe.directory '*'
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"

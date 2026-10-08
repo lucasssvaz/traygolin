@@ -67,14 +67,19 @@ without blocking the others):
 
 ## Apt repository (GitHub Pages)
 
-`.github/workflows/pages.yml` runs after a release (and from **workflow_dispatch**).
+The Release workflow publishes the apt repo after the GitHub release exists
+(so it can see the new `.deb`s). `GITHUB_TOKEN` cannot trigger a separate
+`on: release` workflow, which is why apt is a job in Release rather than a
+follow-up run. Rebuild from the Actions tab with **Apt repository**
+(`workflow_dispatch`) if Pages was not enabled yet.
+
 It downloads every `*.deb` from GitHub Releases, builds `dists/stable` with
 `dpkg-scanpackages`, and deploys to GitHub Pages. Enable Pages with source
-**GitHub Actions**. Optional secret `APT_GPG_PRIVATE_KEY` signs `InRelease`.
+**GitHub Actions**. Secret `APT_GPG_PRIVATE_KEY` signs `InRelease`.
 
 ## AUR publishing
 
-After the release job, the Release workflow calls `.github/workflows/aur.yml`.
+After the GitHub release job, the same Release workflow calls `.github/workflows/aur.yml`.
 It sets `traygolin-bin` to the new version and checksum, syncs the
 `traygolin-git` PKGBUILD, regenerates `.SRCINFO` with `makepkg`, and pushes
 only when something changed. The checksum comes from the release job (or the

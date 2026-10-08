@@ -1,8 +1,10 @@
 name: Apt repository
 
+# Called by Release after the GitHub release exists. Run by hand to rebuild
+# the Pages apt repo from every published .deb without tagging again.
+# Do not use on: release — GITHUB_TOKEN-created releases do not trigger it.
 on:
-  release:
-    types: [published]
+  workflow_call:
   workflow_dispatch:
 
 concurrency:
