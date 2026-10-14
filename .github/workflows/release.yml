@@ -121,7 +121,7 @@ jobs:
       sha256: ${{ steps.sums.outputs.sha256 }}
       sha256_arm64: ${{ steps.sums.outputs.sha256_arm64 }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: dist-*
           merge-multiple: true
