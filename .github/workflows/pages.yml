@@ -50,7 +50,7 @@ jobs:
           base="https://${owner}.github.io/${name}"
           bash packaging/apt/generate-repo.sh "$PWD/debs" "$PWD/public" "$base"
           find public -type f | sort
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: public
       - id: deploy
