@@ -1,5 +1,5 @@
-deedles.dev/tray v0.1.11 h1:TfxDRPawqwOsyXnqyF6A0S8b6/8AHC69Z47y9Cb0QIo=
-deedles.dev/tray v0.1.11/go.mod h1:A4RqMRUWoMjlI2GEuvOpjX9uPiZtqFnsmaV0gDzZFgo=
+deedles.dev/tray v0.1.14 h1:p8QdugsEmnnpvKqFQLCO96WlUm9KKWa0JUu4UYUhVes=
+deedles.dev/tray v0.1.14/go.mod h1:A4RqMRUWoMjlI2GEuvOpjX9uPiZtqFnsmaV0gDzZFgo=
 github.com/diamondburned/gotk4-adwaita/pkg v0.0.0-20260808200908-d4aecaa0ff32 h1:1EATAO7ZRrY7B7lt6djCzGnLPlKXPzuOuwPzDSF7jT0=
 github.com/diamondburned/gotk4-adwaita/pkg v0.0.0-20260808200908-d4aecaa0ff32/go.mod h1:ZzYiyPe0TqsukfPHi0sK/WwKzm0wIJdSRylLnuvAZNw=
 github.com/diamondburned/gotk4/pkg v0.4.1 h1:w4BwVUUBkKyNLz5HKHN2Oz3kZCTLHfpfKgB/su1p6uo=

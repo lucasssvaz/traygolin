@@ -3,7 +3,7 @@ module github.com/lucasssvaz/traygolin
 go 1.26.9
 
 require (
-	deedles.dev/tray v0.1.11
+	deedles.dev/tray v0.1.14
 	github.com/diamondburned/gotk4-adwaita/pkg v0.0.0-20260808200908-d4aecaa0ff32
 	github.com/diamondburned/gotk4/pkg v0.4.1
 )
