@@ -1,11 +1,11 @@
-deedles.dev/tray v0.1.14 h1:p8QdugsEmnnpvKqFQLCO96WlUm9KKWa0JUu4UYUhVes=
-deedles.dev/tray v0.1.14/go.mod h1:A4RqMRUWoMjlI2GEuvOpjX9uPiZtqFnsmaV0gDzZFgo=
+deedles.dev/tray v0.2.0 h1:idycIgJvxeKgCUGqNh6UbokUYEjBDTa55KK3pNSOYes=
+deedles.dev/tray v0.2.0/go.mod h1:sWWCLEqHWHcrUO/2HNKUriTixk2+ZQBoAibFGGO50bI=
 github.com/diamondburned/gotk4-adwaita/pkg v0.0.0-20260808200908-d4aecaa0ff32 h1:1EATAO7ZRrY7B7lt6djCzGnLPlKXPzuOuwPzDSF7jT0=
 github.com/diamondburned/gotk4-adwaita/pkg v0.0.0-20260808200908-d4aecaa0ff32/go.mod h1:ZzYiyPe0TqsukfPHi0sK/WwKzm0wIJdSRylLnuvAZNw=
 github.com/diamondburned/gotk4/pkg v0.4.1 h1:w4BwVUUBkKyNLz5HKHN2Oz3kZCTLHfpfKgB/su1p6uo=
 github.com/diamondburned/gotk4/pkg v0.4.1/go.mod h1:BAEEDXtj5srQ1S2++5HX2K1s9c6CtuWSa60dAywrkRM=
-github.com/godbus/dbus/v5 v5.2.3 h1:IQNSXULh6Nc4ZH8ETJ5Mdsj8loUFCWSBnsjmJkyjUB8=
-github.com/godbus/dbus/v5 v5.2.3/go.mod h1:3AAv2+hPq5rdnr5txxxRwiGjPXamgoIHgz9FPBfOp3c=
+github.com/godbus/dbus/v5 v5.2.4 h1:F2gUCy++NMIxGmo9J+z5le/+ZC8W1OgeR51P4i9ZB/U=
+github.com/godbus/dbus/v5 v5.2.4/go.mod h1:3AAv2+hPq5rdnr5txxxRwiGjPXamgoIHgz9FPBfOp3c=
 golang.org/x/sync v0.23.0 h1:KameEIfc1IkluZyXWLn39Wd4tURc6GbCiISGiZm2bQk=
 golang.org/x/sync v0.23.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
 golang.org/x/sys v0.49.0 h1:XbzkgYJHdqh/8m2Uu0W/dQv8nktxx4BFHp1M0gROTXA=
